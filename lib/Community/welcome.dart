@@ -149,7 +149,16 @@ class _CommunityWelcomePageState extends State<CommunityWelcomePage> with Single
                         const SizedBox(height: 20),
                         // Start Posting button
                         ElevatedButton(
-                          onPressed: () {
+                          onPressed: () async{
+                            final supabase = Supabase.instance.client;
+                            final user = supabase.auth.currentUser;
+                            if (user != null) {
+                              // Update is_first_time to FALSE in profiles table
+                              await supabase
+                                  .from('profiles')
+                                  .update({'is_first_time': false})
+                                  .eq('id', user.id);
+                            }
                             Navigator.push(
                               context,
                               MaterialPageRoute(builder: (context) => CommunityPage()),

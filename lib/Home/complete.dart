@@ -2,25 +2,33 @@ import 'package:flutter/material.dart';
 import 'package:mindhaven/Home/home_page.dart'; // Ensure this matches your project structure
 
 class ExerciseCompletedPage extends StatefulWidget {
-  final double durationMinutes; // Pass the duration in minutes
+  final double durationSeconds; // Pass the duration in seconds
 
-  const ExerciseCompletedPage({super.key, required this.durationMinutes});
+  const ExerciseCompletedPage({super.key, required this.durationSeconds});
 
   @override
   _ExerciseCompletedPageState createState() => _ExerciseCompletedPageState();
 }
 
 class _ExerciseCompletedPageState extends State<ExerciseCompletedPage> {
-  late double _totalTime;
-  late String _timeUnit;
+  late String _formattedDuration;
 
   @override
   void initState() {
     super.initState();
-    _totalTime = widget.durationMinutes;
-    _timeUnit = _totalTime >= 60 ? 'H' : 'M';
-    if (_timeUnit == 'H') {
-      _totalTime = _totalTime / 60; // Convert to hours if >= 60 minutes
+    _formatDuration();
+  }
+
+  void _formatDuration() {
+    int totalSeconds = widget.durationSeconds.round();
+    if (totalSeconds >= 3600) { // 60 minutes = 3600 seconds
+      int hours = totalSeconds ~/ 3600;
+      int minutes = (totalSeconds % 3600) ~/ 60;
+      _formattedDuration = '${hours.toString().padLeft(1, '0')}:${minutes.toString().padLeft(2, '0')}H';
+    } else {
+      int minutes = totalSeconds ~/ 60;
+      int seconds = totalSeconds % 60;
+      _formattedDuration = '${minutes.toString().padLeft(1, '0')}:${seconds.toString().padLeft(2, '0')}M';
     }
   }
 
@@ -68,7 +76,7 @@ class _ExerciseCompletedPageState extends State<ExerciseCompletedPage> {
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
-                  'DURATION: ${_totalTime.toStringAsFixed(2)}$_timeUnit',
+                  'DURATION: $_formattedDuration',
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,

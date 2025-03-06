@@ -113,7 +113,125 @@ class _GraphPageState extends State<GraphPage> {
       print('Error loading history: $e');
     }
   }
+  List<Widget> _getRecommendationsBasedOnScore(int score) {
+    List<Widget> recommendations = [];
 
+    // Define recommendation items with consistent styling
+    Widget buildRecommendation(String text, String route) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 8.0),
+        child: InkWell(
+          onTap: () => Navigator.pushNamed(context, route),
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xfff4eee0),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.blue),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    text,
+                    style: const TextStyle(
+                      color: Colors.black87,
+                      fontSize: 14,
+                      height: 1.4,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (score <= 20) {
+      recommendations = [
+        buildRecommendation(
+          "Meditation: Try a 20-minute breathing exercise to calm your mind",
+          '/exercises',
+        ),
+        buildRecommendation(
+          "AI Chatbot: Chat with Braino now—it's here to listen and help",
+          '/chat',
+        ),
+        buildRecommendation(
+          "Journal: Write a few words about how you feel in your Daily Journal",
+          '/journal',
+        ),
+        buildRecommendation(
+          "Music: Unwind with 'Chirping Birds' on the Music page",
+          '/music',
+        ),
+      ];
+    } else if (score <= 40) {
+      recommendations = [
+        buildRecommendation(
+          "Meditation: Try a 15-minute meditation session",
+          '/meditation',
+        ),
+        buildRecommendation(
+          "Community: Post in the Stress category for advice or support",
+          '/community',
+        ),
+        buildRecommendation(
+          "Photo Journal: Snap a quick photo today for reflection",
+          '/journal',
+        ),
+      ];
+    } else if (score <= 60) {
+      recommendations = [
+        buildRecommendation(
+          "Meditation: How about 10 minutes of yoga?",
+          '/exercises',
+        ),
+        buildRecommendation(
+          "Sleep Tracking: Log your sleep tonight to check mood impact",
+          '/sleep',
+        ),
+        buildRecommendation(
+          "Affirmation: Record a thought like 'I’m doing my best'",
+          '/journal',
+        ),
+      ];
+    } else if (score <= 80) {
+      recommendations = [
+        buildRecommendation(
+          "Meditation: Try a 5-minute mindfulness session",
+          '/meditation',
+        ),
+        buildRecommendation(
+          "Dashboard: Check your mood trends to see progress",
+          '/dashboard',
+        ),
+        buildRecommendation(
+          "Community: Share a positive idea in the Affinity category",
+          '/community',
+        ),
+      ];
+    } else {
+      recommendations = [
+        buildRecommendation(
+          "Meditation: Enjoy a 5-minute yoga flow to stay balanced",
+          '/exercises',
+        ),
+        buildRecommendation(
+          "Music: Unwind with 'Chirping Birds' on the Music page",
+          '/music',
+        ),
+        buildRecommendation(
+          "Community: Post a tip to inspire others",
+          '/community',
+        ),
+      ];
+    }
+
+    return recommendations;
+  }
   Future<void> _loadMoodHistory() async {
     try {
       final supabase = Supabase.instance.client;
@@ -457,25 +575,31 @@ class _GraphPageState extends State<GraphPage> {
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(16),
                         ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Icon(Icons.favorite, color: Colors.green, size: 24),
-                            const Text(
-                              'Recommendations',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.black,
-                              ),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Icon(Icons.favorite, color: Colors.green, size: 24),
+                                Padding(
+                                  padding: const EdgeInsets.only(right: 53.0),
+                                  child: const Text(
+                                    'Recommendations',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.black,
+                                    ),
+                                  ),
+                                ),
+
+                              ],
                             ),
-                            Text(
-                              '$_currentScore+',
-                              style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.green,
-                              ),
+                            const SizedBox(height: 10),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: _getRecommendationsBasedOnScore(_currentScore),
                             ),
                           ],
                         ),

@@ -40,29 +40,31 @@ class _CommunityPageState extends State<CommunityPage> {
         builder: (BuildContext context) {
           return AlertDialog(
             title: const Text('Create Post'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Image.file(
-                  File(image.path),
-                  height: 200,
-                  fit: BoxFit.cover,
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: _captionController,
-                  decoration: const InputDecoration(
-                    hintText: 'Write a caption...',
-                    border: OutlineInputBorder(),
+            content: SingleChildScrollView( // Make the content scrollable
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Image.file(
+                    File(image.path),
+                    height: 200,
+                    fit: BoxFit.cover,
                   ),
-                  maxLines: 3,
-                  onChanged: (value) {
-                    setState(() {
-                      _caption = value;
-                    });
-                  },
-                ),
-              ],
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: _captionController,
+                    decoration: const InputDecoration(
+                      hintText: 'Write a caption...',
+                      border: OutlineInputBorder(),
+                    ),
+                    maxLines: 3,
+                    onChanged: (value) {
+                      setState(() {
+                        _caption = value;
+                      });
+                    },
+                  ),
+                ],
+              ),
             ),
             actions: [
               TextButton(
@@ -112,7 +114,7 @@ class _CommunityPageState extends State<CommunityPage> {
   Future _fetchPosts() async {
     debugPrint('Attempting to fetch posts...');
     setState(() {
-      _isLoading = true; // Set loading to true before fetching
+      _isLoading = true;
     });
     try {
       final supabase = Supabase.instance.client;
@@ -121,51 +123,42 @@ class _CommunityPageState extends State<CommunityPage> {
       final response = await supabase
           .from('community_posts')
           .select('id, user_id, image_url, caption, upvotes, downvotes, created_at')
-          .order('upvotes', ascending: false); // Sort by upvotes descending
-      debugPrint('Supabase response: $response');
+          .order('upvotes', ascending: false);
 
-      Set<String> uniqueHashtags = {}; // Store unique hashtags
+      Set<String> uniqueHashtags = {};
+
+      final postsWithVotes = await Future.wait(response.map((post) async {
+        String createdAt = post['created_at']?.toString() ?? DateTime.now().toIso8601String();
+        String? userVote;
+
+        if (user != null) {
+          final voteResponse = await supabase
+              .from('user_votes')
+              .select('vote_type')
+              .eq('user_id', user.id)
+              .eq('post_id', post['id'])
+              .maybeSingle();
+          userVote = voteResponse?['vote_type'] as String?;
+        }
+
+        List<String> hashtags = _extractHashtags(post['caption'] ?? '');
+        hashtags.forEach((hashtag) => uniqueHashtags.add(hashtag.toLowerCase()));
+
+        return {
+          'id': post['id'],
+          'user_id': post['user_id'],
+          'image_url': post['image_url'],
+          'caption': post['caption'] ?? '',
+          'upvotes': (post['upvotes'] ?? 0) as int,
+          'downvotes': (post['downvotes'] ?? 0) as int,
+          'created_at': createdAt,
+          'userVote': userVote,
+          'hashtags': hashtags,
+        };
+      }));
 
       setState(() {
-        _posts = response.map((post) {
-          // Ensure created_at is a valid ISO 8601 string
-          String createdAt = post['created_at']?.toString() ?? DateTime.now().toIso8601String();
-          String? userVote = null;
-          if (user != null) {
-            // Fetch the user's vote for this post if logged in
-            supabase.from('user_votes')
-                .select('vote_type')
-                .eq('user_id', user.id)
-                .eq('post_id', post['id'])
-                .single()
-                .then((vote) {
-              userVote = vote['vote_type'] as String?;
-            }).catchError((e) {
-              print('Error fetching user vote: $e');
-              userVote = null;
-            });
-          }
-
-          // Parse hashtags from the caption (e.g., #job, #stress)
-          List<String> hashtags = _extractHashtags(post['caption'] ?? '');
-          hashtags.forEach((hashtag) {
-            uniqueHashtags.add(hashtag.toLowerCase()); // Add to set, converting to lowercase for consistency
-          });
-
-          return {
-            'id': post['id'],
-            'user_id': post['user_id'],
-            'image_url': post['image_url'],
-            'caption': post['caption'] ?? '', // Default to empty string if null
-            'upvotes': (post['upvotes'] ?? 0) as int,
-            'downvotes': (post['downvotes'] ?? 0) as int,
-            'created_at': createdAt,
-            'userVote': userVote, // Store the user's current vote (upvote/downvote or null)
-            'hashtags': hashtags, // Store hashtags for this post
-          };
-        }).toList();
-
-        // Store unique hashtags in the state
+        _posts = postsWithVotes;
         _uniqueHashtags = uniqueHashtags.toList();
       });
       debugPrint('Fetched posts: $_posts');
@@ -177,7 +170,7 @@ class _CommunityPageState extends State<CommunityPage> {
       );
     } finally {
       setState(() {
-        _isLoading = false; // Set loading to false after fetching (or on error)
+        _isLoading = false;
       });
     }
   }
@@ -300,7 +293,7 @@ class _CommunityPageState extends State<CommunityPage> {
         return;
       }
 
-      final postIdNum = int.tryParse(postId) ?? 0; // Safely convert postId to int, default to 0 if invalid
+      final postIdNum = int.tryParse(postId) ?? 0; // Safely convert postId to int
       if (postIdNum == 0) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Invalid post ID.')),
@@ -308,20 +301,18 @@ class _CommunityPageState extends State<CommunityPage> {
         return;
       }
 
-      // Check the user's current vote for this post
       final existingVote = await supabase
           .from('user_votes')
           .select('vote_type')
           .eq('user_id', user.id)
           .eq('post_id', postIdNum)
           .single()
-          .then((value) => value as Map<String, dynamic>?) // Explicitly cast the result
+          .then((value) => value as Map<String, dynamic>?)
           .catchError((e) {
         print('Error checking existing vote: $e');
-        return null; // Return null, matching Map<String, dynamic>?
+        return null;
       });
 
-      // Get the current post data from Supabase directly (in case _posts is outdated)
       final postResponse = await supabase
           .from('community_posts')
           .select('upvotes, downvotes')
@@ -329,7 +320,7 @@ class _CommunityPageState extends State<CommunityPage> {
           .single()
           .catchError((e) {
         print('Error fetching post data: $e');
-        return null; // Return null if the post isn’t found
+        return null;
       }) as Map<String, dynamic>?;
 
       if (postResponse == null) {
@@ -339,33 +330,26 @@ class _CommunityPageState extends State<CommunityPage> {
         return;
       }
 
-      // Use the post data from Supabase
       int currentUpvotes = postResponse['upvotes'] as int? ?? 0;
       int currentDownvotes = postResponse['downvotes'] as int? ?? 0;
 
       if (existingVote != null) {
-        // User has already voted; check and update the vote
         String? currentVoteType = existingVote['vote_type'] as String?;
         if (currentVoteType == 'upvote' && !isUpvote) {
-          // Change from upvote to downvote: decrease upvotes, increase downvotes
           currentUpvotes -= 1;
           currentDownvotes += 1;
           await supabase.from('user_votes').update({'vote_type': 'downvote'}).eq('user_id', user.id).eq('post_id', postIdNum);
           await supabase.from('community_posts').update({'upvotes': currentUpvotes, 'downvotes': currentDownvotes}).eq('id', postIdNum);
         } else if (currentVoteType == 'downvote' && isUpvote) {
-          // Change from downvote to upvote: increase upvotes, decrease downvotes
           currentUpvotes += 1;
           currentDownvotes -= 1;
           await supabase.from('user_votes').update({'vote_type': 'upvote'}).eq('user_id', user.id).eq('post_id', postIdNum);
           await supabase.from('community_posts').update({'upvotes': currentUpvotes, 'downvotes': currentDownvotes}).eq('id', postIdNum);
         } else {
-          // User clicked the same vote type again (e.g., upvote on upvote)—no change needed
           return;
         }
       } else {
-        // User has not voted yet; add new vote
         if (isUpvote) {
-          // Add upvote: increase upvotes
           currentUpvotes += 1;
           await supabase.from('user_votes').insert({
             'user_id': user.id,
@@ -374,7 +358,6 @@ class _CommunityPageState extends State<CommunityPage> {
           });
           await supabase.from('community_posts').update({'upvotes': currentUpvotes}).eq('id', postIdNum);
         } else {
-          // Add downvote: increase downvotes
           currentDownvotes += 1;
           await supabase.from('user_votes').insert({
             'user_id': user.id,
@@ -385,7 +368,6 @@ class _CommunityPageState extends State<CommunityPage> {
         }
       }
 
-      // Refresh posts to reflect the new vote counts
       await _fetchPosts();
     } catch (e) {
       print('Error voting: $e');
@@ -396,9 +378,10 @@ class _CommunityPageState extends State<CommunityPage> {
   }
 
   void _showPostOptions(BuildContext context, Map<String, dynamic> post) {
+    print('Showing options for post: ${post['id']}');
     showModalBottomSheet(
       context: context,
-      builder: (BuildContext context) {
+      builder: (BuildContext sheetContext) {
         return Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -406,16 +389,18 @@ class _CommunityPageState extends State<CommunityPage> {
               leading: const Icon(Icons.edit),
               title: const Text('Update'),
               onTap: () {
-                _showUpdateCaptionDialog(context, post);
-                Navigator.pop(context);
+                print('Update tapped for post: ${post['id']}');
+                Navigator.pop(sheetContext); // Close bottom sheet
+                _showUpdateCaptionDialog(context, post); // Use original context
               },
             ),
             ListTile(
               leading: const Icon(Icons.delete),
               title: const Text('Delete'),
               onTap: () {
+                print('Delete tapped for post: ${post['id']}');
+                Navigator.pop(sheetContext);
                 _deletePost(post);
-                Navigator.pop(context);
               },
             ),
           ],
@@ -425,46 +410,54 @@ class _CommunityPageState extends State<CommunityPage> {
   }
 
   void _showUpdateCaptionDialog(BuildContext context, Map<String, dynamic> post) {
+    print('Attempting to show update dialog for post: ${post['id']}');
     final TextEditingController captionController = TextEditingController(text: post['caption'] ?? '');
     showDialog(
       context: context,
-      builder: (BuildContext context) {
+      builder: (BuildContext dialogContext) {
+        print('Dialog builder called');
         return AlertDialog(
           title: const Text('Update Caption'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Show the image to confirm it's the same post
-              Image.network(
-                post['image_url'],
-                height: 200,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    height: 200,
-                    color: Colors.grey[300],
-                    child: const Center(child: Text('Image not available')),
-                  );
-                },
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: captionController,
-                decoration: const InputDecoration(
-                  hintText: 'Enter new caption...',
-                  border: OutlineInputBorder(),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Image.network(
+                  post['image_url'],
+                  height: 200,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    print('Image load error: $error');
+                    return Container(
+                      height: 200,
+                      color: Colors.grey[300],
+                      child: const Center(child: Text('Image not available')),
+                    );
+                  },
                 ),
-                maxLines: 3,
-              ),
-            ],
+                const SizedBox(height: 16),
+                TextField(
+                  controller: captionController,
+                  decoration: const InputDecoration(
+                    hintText: 'Enter new caption...',
+                    border: OutlineInputBorder(),
+                  ),
+                  maxLines: 3,
+                ),
+              ],
+            ),
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () {
+                print('Cancel pressed');
+                Navigator.pop(dialogContext);
+              },
               child: const Text('Cancel'),
             ),
             TextButton(
               onPressed: () async {
+                print('Update pressed with caption: ${captionController.text}');
                 if (captionController.text.trim().isEmpty) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Caption cannot be empty')),
@@ -474,10 +467,11 @@ class _CommunityPageState extends State<CommunityPage> {
                 try {
                   final supabase = Supabase.instance.client;
                   await supabase.from('community_posts').update({
-                    'caption': captionController.text.trim(), // Update with new caption
+                    'caption': captionController.text.trim(),
                   }).eq('id', post['id']);
-                  await _fetchPosts(); // Refresh posts after update
-                  Navigator.pop(context);
+                  Navigator.pop(dialogContext); // Close dialog
+                  await _fetchPosts(); // Refresh posts
+                  setState(() {}); // Ensure UI updates
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Caption updated successfully!')),
                   );
@@ -493,23 +487,21 @@ class _CommunityPageState extends State<CommunityPage> {
           ],
         );
       },
-    );
+    ).catchError((e) {
+      print('Error showing dialog: $e');
+    });
   }
 
   Future<void> _deletePost(Map<String, dynamic> post) async {
     try {
       final supabase = Supabase.instance.client;
-      // Delete the post image from storage
       final imageUrl = post['image_url'];
       if (imageUrl != null) {
-        final fileName = imageUrl.split('/').last; // Extract file name from URL
+        final fileName = imageUrl.split('/').last;
         await supabase.storage.from('community_images').remove([fileName]);
       }
-      // Delete the post from the database
       await supabase.from('community_posts').delete().eq('id', post['id']);
-      // Also delete any associated votes
       await supabase.from('user_votes').delete().eq('post_id', post['id']);
-      // Refresh posts after deletion
       await _fetchPosts();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Post deleted successfully!')),
@@ -524,7 +516,6 @@ class _CommunityPageState extends State<CommunityPage> {
 
   @override
   Widget build(BuildContext context) {
-    // Filter posts based on the theme (hashtag) if provided
     List<Map<String, dynamic>> displayedPosts = widget.theme != null
         ? _posts.where((post) {
       final hashtags = post['hashtags'] as List<String>? ?? [];
@@ -536,7 +527,6 @@ class _CommunityPageState extends State<CommunityPage> {
       body: SafeArea(
         child: Column(
           children: [
-            // User profile section (background #9bb068)
             Container(
               padding: const EdgeInsets.all(16.0),
               decoration: const BoxDecoration(
@@ -577,17 +567,19 @@ class _CommunityPageState extends State<CommunityPage> {
                 ],
               ),
             ),
-            // Themed Discussion Section (now with dynamic hashtag buttons)
             Padding(
               padding: const EdgeInsets.all(16.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Themed Discussion',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: const Text(
+                      'Themed Discussion',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 10),
@@ -595,22 +587,37 @@ class _CommunityPageState extends State<CommunityPage> {
                     Wrap(
                       spacing: 8.0,
                       runSpacing: 8.0,
-                      children: _uniqueHashtags.map((hashtag) {
-                        String buttonText = hashtag.replaceAll('#', '').toUpperCase(); // Remove # and capitalize
+                      children: _uniqueHashtags.asMap().entries.map((entry) {
+                        int index = entry.key;
+                        String hashtag = entry.value;
+                        String buttonText = hashtag.replaceAll('#', '').toUpperCase();
+
+                        Color buttonColor;
+                        switch (index % 3) {
+                          case 0:
+                            buttonColor = Color(0xff9bb068);
+                            break;
+                          case 1:
+                            buttonColor = Color(0xff6b9b68);
+                            break;
+                          case 2:
+                            buttonColor = Color(0xff689b9b);
+                            break;
+                          default:
+                            buttonColor = Colors.grey;
+                        }
+
                         return ElevatedButton(
                           onPressed: () {
-                            // Get the current route's theme (if any) from CommunityPage
-                            final currentTheme = widget.theme; // Use widget.theme directly
+                            final currentTheme = widget.theme;
                             if (currentTheme == buttonText) {
-                              // If the button text matches the current theme, reset to show all posts
                               Navigator.pushReplacement(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (context) => const CommunityPage(), // No theme parameter to show all posts
+                                  builder: (context) => const CommunityPage(),
                                 ),
                               );
                             } else {
-                              // Navigate to filter by this hashtag
                               Navigator.pushReplacement(
                                 context,
                                 MaterialPageRoute(
@@ -620,7 +627,7 @@ class _CommunityPageState extends State<CommunityPage> {
                             }
                           },
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.grey[300],
+                            backgroundColor: buttonColor,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
@@ -628,7 +635,7 @@ class _CommunityPageState extends State<CommunityPage> {
                           ),
                           child: Text(
                             buttonText,
-                            style: const TextStyle(color: Colors.black, fontSize: 14),
+                            style: const TextStyle(color: Colors.white, fontSize: 14),
                           ),
                         );
                       }).toList(),
@@ -636,16 +643,15 @@ class _CommunityPageState extends State<CommunityPage> {
                 ],
               ),
             ),
-            // Posts Section (now below Themed Discussion, with loading state and filtering)
             Expanded(
               child: _isLoading
-                  ? Center(child: CircularProgressIndicator()) // Show loading indicator
+                  ? const Center(child: CircularProgressIndicator())
                   : SingleChildScrollView(
                 child: Column(
                   children: [
                     if (displayedPosts.isEmpty)
-                      Padding(
-                        padding: const EdgeInsets.all(16.0),
+                      const Padding(
+                        padding: EdgeInsets.all(16.0),
                         child: Text('No posts yet for this theme. Be the first to share!'),
                       )
                     else
@@ -682,7 +688,7 @@ class _CommunityPageState extends State<CommunityPage> {
                                           );
                                         }
                                         if (snapshot.hasError || !snapshot.hasData) {
-                                          return CircleAvatar(
+                                          return const CircleAvatar(
                                             radius: 20,
                                             backgroundImage: NetworkImage('https://via.placeholder.com/64'),
                                           );
@@ -710,23 +716,25 @@ class _CommunityPageState extends State<CommunityPage> {
                                     ),
                                     subtitle: Text(
                                       DateFormat('MMM d, hh:mm a').format(DateTime.parse(post['created_at'])),
-                                      style: TextStyle(color: Colors.grey),
+                                      style: const TextStyle(color: Colors.grey),
                                     ),
                                     trailing: isCurrentUserPost
                                         ? IconButton(
                                       icon: const Icon(Icons.more_vert),
-                                      onPressed: () => _showPostOptions(context, post),
+                                      onPressed: () {
+                                        print('Three-dot clicked for post: ${post['id']}');
+                                        _showPostOptions(context, post);
+                                      },
                                       iconSize: 24,
                                     )
-                                        : null, // No 3-dot button for non-owners
-                                    // Removed the verified badge
+                                        : null,
                                   ),
                                   Padding(
                                     padding: const EdgeInsets.all(8.0),
                                     child: Image.network(
                                       post['image_url'],
                                       width: double.infinity,
-                                      height: 300, // Larger image for Instagram-like feel
+                                      height: 300,
                                       fit: BoxFit.cover,
                                       errorBuilder: (context, error, stackTrace) {
                                         return Container(
@@ -796,7 +804,6 @@ class _CommunityPageState extends State<CommunityPage> {
   }
 }
 
-// Updated ThemedDiscussionPage (placeholder, now just a redirect to CommunityPage with theme)
 class ThemedDiscussionPage extends StatelessWidget {
   final String theme;
 
@@ -804,7 +811,6 @@ class ThemedDiscussionPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Immediately redirect to CommunityPage with the theme filter
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Navigator.pushReplacement(
         context,
@@ -815,7 +821,7 @@ class ThemedDiscussionPage extends StatelessWidget {
     });
 
     return const Scaffold(
-      body: Center(child: CircularProgressIndicator()), // Show loading while redirecting
+      body: Center(child: CircularProgressIndicator()),
     );
   }
 }

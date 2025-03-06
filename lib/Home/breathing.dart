@@ -19,6 +19,8 @@ class _BreathingExercisePageState extends State<BreathingExercisePage> {
   int _remainingSeconds = 300; // Total remaining time in seconds (default 5:00)
   Timer? _timer; // Countdown timer
   bool _isRunning = false;
+  bool _hasStarted = false; // Flag to track if timer has started
+  DateTime? _startTime; // Track the exact start time
   TextEditingController _minutesController = TextEditingController(text: '5');
   TextEditingController _secondsController = TextEditingController(text: '00');
   VideoPlayerController? _videoController; // Video player controller
@@ -76,6 +78,8 @@ class _BreathingExercisePageState extends State<BreathingExercisePage> {
 
       setState(() {
         _isRunning = true;
+        _hasStarted = true; // Mark that the timer has started
+        _startTime = DateTime.now(); // Record start time
       });
 
       // Start video playback
@@ -106,16 +110,19 @@ class _BreathingExercisePageState extends State<BreathingExercisePage> {
       _minutesController.text = (_remainingSeconds ~/ 60).toString().padLeft(2, '0');
       _secondsController.text = (_remainingSeconds % 60).toString().padLeft(2, '0');
     });
-    _saveCompletedTime(); // Save completed time when timer stops
-    // Navigate to ExerciseCompletedPage with the completed duration
-    double completedMinutes = ((int.tryParse(_minutesController.text) ?? 0) * 60 +
-        (int.tryParse(_secondsController.text) ?? 0) - _remainingSeconds) / 60.0;
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (context) => ExerciseCompletedPage(durationMinutes: completedMinutes),
-      ),
-    );
+    _saveCompletedTime(); // Save completed time when timer stops, but don’t navigate
+  }
+
+  void _completeExercise() {
+    if (_startTime != null) {
+      int elapsedSeconds = DateTime.now().difference(_startTime!).inSeconds;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ExerciseCompletedPage(durationSeconds: elapsedSeconds.toDouble()),
+        ),
+      );
+    }
   }
 
   Future<void> _saveSetDuration(double durationInMinutes) async {
@@ -138,28 +145,29 @@ class _BreathingExercisePageState extends State<BreathingExercisePage> {
   }
 
   Future<void> _saveCompletedTime() async {
-    int elapsedSeconds = (int.tryParse(_minutesController.text) ?? 0) * 60 +
-        (int.tryParse(_secondsController.text) ?? 0) - _remainingSeconds;
-    double completedMinutes = elapsedSeconds / 60.0;
+    if (_startTime != null) {
+      int elapsedSeconds = DateTime.now().difference(_startTime!).inSeconds;
+      double completedMinutes = elapsedSeconds / 60.0;
 
-    if (completedMinutes > 0) {
-      try {
-        final supabase = Supabase.instance.client;
-        final user = supabase.auth.currentUser;
-        if (user != null) {
-          await supabase.from('mindful_history').insert({
-            'user_id': user.id,
-            'activity_name': 'Breathing Exercise',
-            'duration': completedMinutes, // Store in minutes
-            'activity_type': 'breathing',
-            'timestamp': DateTime.now().toIso8601String(),
-          });
-          print('Saved completed time: $completedMinutes minutes');
-        } else {
-          print('No user logged in');
+      if (completedMinutes > 0) {
+        try {
+          final supabase = Supabase.instance.client;
+          final user = supabase.auth.currentUser;
+          if (user != null) {
+            await supabase.from('mindful_history').insert({
+              'user_id': user.id,
+              'activity_name': 'Breathing Exercise',
+              'duration': completedMinutes, // Store in minutes
+              'activity_type': 'breathing',
+              'timestamp': DateTime.now().toIso8601String(),
+            });
+            print('Saved completed time: $completedMinutes minutes');
+          } else {
+            print('No user logged in');
+          }
+        } catch (e) {
+          print('Error saving completed time: $e');
         }
-      } catch (e) {
-        print('Error saving completed time: $e');
       }
     }
   }
@@ -209,12 +217,23 @@ class _BreathingExercisePageState extends State<BreathingExercisePage> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Text(
-                    'Breathing Exercise',
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                  Container(
+                    height: 60,
+                    width: 270,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.7),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: const Align(
+                      alignment: Alignment.center,
+                      child: Text(
+                        'Breathing Exercise',
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blue,
+                        ),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 40),
@@ -233,7 +252,7 @@ class _BreathingExercisePageState extends State<BreathingExercisePage> {
                             controller: _minutesController,
                             keyboardType: TextInputType.number,
                             style: const TextStyle(
-                              color: Color(0xffA18FFF),
+                              color: Colors.blue,
                               fontWeight: FontWeight.bold,
                               fontSize: 70,
                             ),
@@ -261,7 +280,7 @@ class _BreathingExercisePageState extends State<BreathingExercisePage> {
                             controller: _secondsController,
                             keyboardType: TextInputType.number,
                             style: const TextStyle(
-                              color: Color(0xffA18FFF),
+                              color: Colors.blue,
                               fontSize: 70,
                               fontWeight: FontWeight.bold,
                             ),
@@ -284,23 +303,41 @@ class _BreathingExercisePageState extends State<BreathingExercisePage> {
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  const SizedBox(height: 40),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      ElevatedButton(
-                        onPressed: _isRunning ? _stopTimer : _startTimer,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.white.withOpacity(0.2),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+                  const SizedBox(height: 310),
+                  Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        ElevatedButton(
+                          onPressed: _isRunning ? _stopTimer : _startTimer,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.white.withOpacity(0.2),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+                          ),
+                          child: Text(
+                            _isRunning ? 'Stop' : 'Start',
+                            style: const TextStyle(fontSize: 18),
+                          ),
                         ),
-                        child: Text(
-                          _isRunning ? 'Stop' : 'Start',
-                          style: const TextStyle(fontSize: 18),
-                        ),
-                      ),
-                    ],
+                        if (!_isRunning && _hasStarted) ...[
+                          const SizedBox(width: 10),
+                          ElevatedButton(
+                            onPressed: _completeExercise,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.white.withOpacity(0.2),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 15),
+                            ),
+                            child: const Text(
+                              'Complete Exercise',
+                              style: TextStyle(fontSize: 18),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
                   ),
                 ],
               ),

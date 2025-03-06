@@ -1,4 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:mindhaven/Community/community.dart';
+import 'package:mindhaven/Home/breathing.dart';
+import 'package:mindhaven/Home/daily_journal.dart';
+import 'package:mindhaven/Home/exercise_page.dart';
+import 'package:mindhaven/Home/graph.dart';
 import 'package:mindhaven/Home/profile.dart';
 import 'package:mindhaven/assessment/question1.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -63,7 +68,16 @@ class MyApp extends StatelessWidget {
         '/EnterNamePage': (context) => const EnterNamePage(),
         '/profile': (context) => const ProfilePage(),
         // Mapping question numbers to assessment pages
-        '/mood': (context) => const MoodPage(), // Question 1: Mood
+        '/mood': (context) => const MoodPage(),
+        '/graph': (context) => const GraphPage(),
+        '/exercises': (context) => ExercisePage(), // Create this page
+        //'/chat': (context) => ChatPage(), // Create this page
+        '/journal': (context) => JournalPage(), // Create this page
+        '/music': (context) => ExercisePage(), // Create this page
+        '/meditation': (context) => BreathingExercisePage(), // Create this page
+        '/community': (context) => CommunityPage(), // Create this page
+         // Create this page
+        '/dashboard': (context) => GraphPage(),// Question 1: Mood
         '/question2': (context) => const QuestionPage(
           questionNumber: 2,
           questionText: 'I feel sad and low',

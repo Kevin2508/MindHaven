@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mindhaven/Community/community.dart';
 import 'package:mindhaven/Home/exercise_page.dart';
 import 'package:mindhaven/Home/health_journal.dart';
 import 'package:mindhaven/Home/photo_journal.dart';
@@ -591,11 +592,40 @@ class _HomePageState extends State<HomePage> {
               _buildFooterButton(
                 icon: Icons.message,
                 isActive: false,
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => CommunityWelcomePage()),
-                  );
+                onPressed: () async {
+                  final supabase = Supabase.instance.client;
+                  final user = supabase.auth.currentUser;
+                  if (user != null) {
+                    final response = await supabase
+                        .from('profiles')
+                        .select('is_first_time')
+                        .eq('id', user.id)
+                        .single()
+                        .catchError((e) {
+                      print('Error fetching is_first_time: $e');
+                      return {'is_first_time': true}; // Default to true if error
+                    });
+
+                    final isFirstTime = response['is_first_time'] as bool? ?? true;
+
+                    if (isFirstTime) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const CommunityWelcomePage()),
+                      );
+                    } else {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const CommunityPage()),
+                      );
+                    }
+                  } else {
+                    // Handle case where user is not logged in (optional)
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const CommunityPage()),
+                    );
+                  }
                 },
               ),
               _buildFooterButton(
@@ -641,9 +671,67 @@ class _HomePageState extends State<HomePage> {
     TextAlign titleAlignment = TextAlign.left,
     required Orientation orientation,
     bool isScoreButton = false,
+
   }) {
+    if (title == 'Health Journal') {
+      return SizedBox(
+        width: MediaQuery.of(context).size.width * 0.45,
+        height: MediaQuery.of(context).size.height * 0.25,
+        child: ElevatedButton(
+          onPressed: onPressed,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: color,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(MediaQuery.of(context).size.width * 0.04),
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(top: 8.0, left: 8.0),
+                child: Text(
+                  'Health Journal',
+                  style: TextStyle(
+                    fontSize: orientation == Orientation.portrait ? 16 : 12,
+                    color: textColor,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Expanded(
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.all(8.0),
+                    child: GridView.count(
+                      crossAxisCount: 6, // 6 columns
+                      mainAxisSpacing: 4.0,
+                      crossAxisSpacing: 4.0,
+                      childAspectRatio: 1.0, // Square boxes
+                      physics: const NeverScrollableScrollPhysics(), // Disable scrolling
+                      shrinkWrap: true,
+                      children: List.generate(30, (index) {
+                        // Example opacities: vary based on index or data
+                        double opacity = (index % 3 == 0) ? 1.0 : (index % 3 == 1) ? 0.6 : 0.3;
+                        return Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(opacity),
+                            borderRadius: BorderRadius.circular(4.0),
+                          ),
+                        );
+                      }),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
     return SizedBox(
-      width: MediaQuery.of(context).size.width * 0.4,
+      width: MediaQuery.of(context).size.width * 0.45,
       height: MediaQuery.of(context).size.height * 0.25,
       child: ElevatedButton(
         onPressed: onPressed,

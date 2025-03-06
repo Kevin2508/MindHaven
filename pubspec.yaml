@@ -36,9 +36,18 @@ dependencies:
   cupertino_icons: ^1.0.8
   flutter_launcher_icons: ^0.14.3
   font_awesome_flutter: ^10.1.0
-  supabase_flutter: ^2.8.4
-
+  supabase_flutter: ^2.0.0
+  fl_chart: ^0.70.2
   intl: ^0.20.2
+  sensors_plus: ^6.1.1
+  flutter_background_service: ^5.1.0
+  audioplayers: ^6.2.0
+  image_picker: ^1.0.4
+  pie_chart: ^5.4.0
+  video_player: ^2.9.3
+  camera: ^0.11.1
+  path_provider: ^2.1.5
+  permission_handler: ^10.4.0
 
 dev_dependencies:
   flutter_test:
@@ -68,7 +77,12 @@ flutter:
   #   - images/a_dot_ham.jpeg
   assets:
     - assets/images/
-    - assets/audios/
+    - assets/audios/birds.mp3
+    - assets/audios/Calm Ocean Waves.mp3
+    - assets/audios/Forest Serenity.mp3
+    - assets/audios/Gentle Rain.mp3
+    - assets/audios/breathing.mp3
+    - assets/videos/breathing_background.mp4
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
 

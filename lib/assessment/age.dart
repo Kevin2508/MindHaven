@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'dart:math';
 
 class AgePage extends StatefulWidget {
   const AgePage({Key? key}) : super(key: key);
@@ -46,7 +47,7 @@ class _AgePageState extends State<AgePage> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Age stored successfully!')),
       );
-      Navigator.pushReplacementNamed(context, '/question2');
+      Navigator.pushReplacementNamed(context, '/profile_picture'); // Changed to navigate to ProfilePicturePage
     } on PostgrestException catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Postgrest Error: ${e.message} (Code: ${e.code}, Details: ${e.details})')),
@@ -123,7 +124,7 @@ class _AgePageState extends State<AgePage> {
                             ? MediaQuery.of(context).size.height * 0.2
                             : MediaQuery.of(context).size.width * 0.2,
                         diameterRatio: 1.5,
-                        perspective: 0.002,
+                        perspective: 0.001,
                         physics: const FixedExtentScrollPhysics(),
                         onSelectedItemChanged: (index) {
                           setState(() {
@@ -141,33 +142,36 @@ class _AgePageState extends State<AgePage> {
                             return Center(
                               child: AnimatedContainer(
                                 duration: const Duration(milliseconds: 200),
-                                width: MediaQuery.of(context).size.width * 0.4,
+                                width: MediaQuery.of(context).size.width * 0.7,
                                 height: orientation == Orientation.portrait
-                                    ? MediaQuery.of(context).size.height * 0.2
-                                    : MediaQuery.of(context).size.width * 0.2,
+                                    ? MediaQuery.of(context).size.height * 0.5
+                                    : MediaQuery.of(context).size.width * 0.5,
                                 transform: Matrix4.identity()..scale(scale),
                                 decoration: isSelected
                                     ? BoxDecoration(
                                   color: const Color(0xFF9BB068).withOpacity(0.3),
-                                  borderRadius: BorderRadius.circular(12),
+                                  borderRadius: BorderRadius.circular(102),
                                 )
                                     : null,
                                 child: Center(
-                                  child: Text(
-                                    "$age",
-                                    style: TextStyle(
-                                      fontSize: isSelected ? 128 : 40,
-                                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                                      color: const Color(0xFF2E4A2E),
-                                      shadows: isSelected
-                                          ? [
-                                        Shadow(
-                                          color: Colors.black26,
-                                          offset: const Offset(1, 1),
-                                          blurRadius: 2,
-                                        ),
-                                      ]
-                                          : [],
+                                  child: Padding(
+                                    padding: const EdgeInsets.only(bottom: 8.0),
+                                    child: Text(
+                                      "$age",
+                                      style: TextStyle(
+                                        fontSize: isSelected ? 100 : 40,
+                                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                        color: const Color(0xFF2E4A2E),
+                                        shadows: isSelected
+                                            ? [
+                                          Shadow(
+                                            color: Colors.black26,
+                                            offset: const Offset(1, 1),
+                                            blurRadius: 2,
+                                          ),
+                                        ]
+                                            : [],
+                                      ),
                                     ),
                                   ),
                                 ),

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:mindhaven/Home/graph.dart';
+import 'package:mindhaven/Home/home_page.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:intl/intl.dart'; // Added for date formatting
 
 class ScorePage extends StatefulWidget {
   const ScorePage({super.key});
@@ -10,15 +13,13 @@ class ScorePage extends StatefulWidget {
 
 class _ScorePageState extends State<ScorePage> {
   int _currentScore = 0; // Initial score will be calculated
-  final List<Map<String, dynamic>> _mentalScoreHistory = [
-    {'date': 'SEP 12', 'mood': 'Anxious, Depressed', 'score': 0, 'recommendation': 'Please do 25m Mindfulness.'},
-    {'date': 'SEP 11', 'mood': 'Very Happy', 'score': 0, 'recommendation': 'No Recommendation.'},
-  ];
+  List<Map<String, dynamic>> _mentalScoreHistory = []; // Dynamic history list
 
   @override
   void initState() {
     super.initState();
     _calculateInitialScore();
+    _loadHistory();
   }
 
   Future<void> _calculateInitialScore() async {
@@ -26,27 +27,123 @@ class _ScorePageState extends State<ScorePage> {
       final supabase = Supabase.instance.client;
       final user = supabase.auth.currentUser;
       if (user != null) {
-        final responses = await supabase
-            .from('questionnaire_responses')
-            .select('question_number, answer')
-            .eq('user_id', user.id);
+        // Check activity entry counts
+        final journalCount = (await supabase
+            .from('journal_entries')
+            .select('id')
+            .eq('user_id', user.id)).length;
+        final exerciseCount = (await supabase
+            .from('exercise_entries')
+            .select('id')
+            .eq('user_id', user.id)).length;
+        final photoCount = (await supabase
+            .from('photo_entries')
+            .select('id')
+            .eq('user_id', user.id)).length;
 
-        if (responses.isEmpty) {
-          setState(() {
-            _currentScore = 0;
+        int calculatedScore;
+
+        if (journalCount == 0 && exerciseCount == 0 && photoCount == 0) {
+          print('No activity entries, calculating initial assessment score');
+          final moodEntry = await supabase
+              .from('mood_entries')
+              .select('score')
+              .eq('user_id', user.id)
+              .order('timestamp', ascending: false)
+              .limit(1)
+              .maybeSingle();
+          final moodScore = moodEntry != null ? (moodEntry['score'] as int? ?? 0) : 0;
+
+          final responses = await supabase
+              .from('questionnaire_responses')
+              .select('question_number, answer, score')
+              .eq('user_id', user.id)
+              .gte('question_number', 2)
+              .lte('question_number', 21);
+
+          if (responses.isEmpty) {
+            calculatedScore = moodScore;
+          } else {
+            int totalQuestionScore = 0;
+            for (var response in responses) {
+              final questionNumber = response['question_number'] as int;
+              final answer = response['answer'] as String;
+              final score = response['score'] as int? ?? _calculateQuestionScore(questionNumber, answer);
+              totalQuestionScore += score;
+            }
+            calculatedScore = ((moodScore + totalQuestionScore) / 2).round();
+          }
+        } else {
+          print('Calculating score from activity moods');
+          final journalMoodResponse = await supabase
+              .from('journal_entries')
+              .select('mood')
+              .eq('user_id', user.id)
+              .order('timestamp', ascending: false)
+              .limit(1);
+          final journalMood = journalMoodResponse.isNotEmpty
+              ? journalMoodResponse[0]['mood'] as String?
+              : null;
+
+          final exerciseMoodResponse = await supabase
+              .from('exercise_entries')
+              .select('mood')
+              .eq('user_id', user.id)
+              .order('timestamp', ascending: false)
+              .limit(1);
+          final exerciseMood = exerciseMoodResponse.isNotEmpty
+              ? exerciseMoodResponse[0]['mood'] as String?
+              : null;
+
+          final photoMoodResponse = await supabase
+              .from('photo_entries')
+              .select('mood')
+              .eq('user_id', user.id)
+              .order('timestamp', ascending: false)
+              .limit(1);
+          final photoMood = photoMoodResponse.isNotEmpty
+              ? photoMoodResponse[0]['mood'] as String?
+              : null;
+
+          int moodValue1 = _getMoodValue(journalMood);
+          int moodValue2 = _getMoodValue(exerciseMood);
+          int moodValue3 = _getMoodValue(photoMood);
+
+          double averageMood = (moodValue1 + moodValue2 + moodValue3) / 3.0;
+          calculatedScore = ((averageMood - 1) / 4 * 100).round();
+        }
+
+        setState(() {
+          _currentScore = calculatedScore;
+        });
+
+        // Update history (unchanged from original)
+        final today = DateFormat('dd MMM').format(DateTime.now()).toUpperCase();
+        final existingEntry = await supabase
+            .from('mental_score_history')
+            .select('id')
+            .eq('user_id', user.id)
+            .eq('date', today)
+            .maybeSingle();
+
+        if (existingEntry == null) {
+          await supabase.from('mental_score_history').insert({
+            'user_id': user.id,
+            'score': _currentScore,
+            'date': today,
+            'mood': _getMoodFromScore(_currentScore),
+            'recommendation': _getScoreMessage(_currentScore),
           });
-          return;
+        } else {
+          await supabase
+              .from('mental_score_history')
+              .update({
+            'score': _currentScore,
+            'mood': _getMoodFromScore(_currentScore),
+            'recommendation': _getScoreMessage(_currentScore),
+          })
+              .eq('id', existingEntry['id']);
         }
-
-        int totalScore = 0;
-        for (var response in responses) {
-          final questionNumber = response['question_number'] as int;
-          final answer = response['answer'] as String;
-          totalScore += _calculateQuestionScore(questionNumber, answer);
-        }
-        // Normalize score to 0-100 and round to the nearest integer
-        _currentScore = ((totalScore / 70) * 100).round();
-        setState(() {});
       }
     } catch (e) {
       print('Error calculating score: $e');
@@ -56,77 +153,209 @@ class _ScorePageState extends State<ScorePage> {
     }
   }
 
+  Future<void> _loadHistory() async {
+    try {
+      final supabase = Supabase.instance.client;
+      final user = supabase.auth.currentUser;
+      if (user != null) {
+        final history = await supabase
+            .from('mental_score_history')
+            .select('date, score, mood, recommendation')
+            .eq('user_id', user.id)
+            .order('timestamp', ascending: false)
+            .limit(5); // Load last 5 unique days
+        setState(() {
+          _mentalScoreHistory = List<Map<String, dynamic>>.from(history);
+        });
+      }
+    } catch (e) {
+      print('Error loading history: $e');
+    }
+  }
+
   int _calculateQuestionScore(int questionNumber, String answer) {
-    // Define scoring logic (0-10 per question, adjust weights as needed)
-    switch (questionNumber) {
-      case 3: // How often do you struggle with anxious thoughts?
-        switch (answer) {
-          case 'Rarely': return 10;
-          case 'Sometimes': return 7;
-          case 'Often': return 4;
-          case 'Always': return 1;
-          default: return 0;
-        }
-      case 4: // Trouble sleeping?
-        switch (answer) {
-          case 'No': return 10;
-          case 'Sometimes': return 6;
-          case 'Yes': return 2;
-          default: return 0;
-        }
-      case 5: // Physical activity?
-        switch (answer) {
-          case 'Daily': return 10;
-          case 'Several times a week': return 8;
-          case 'Rarely': return 4;
-          case 'Never': return 1;
-          default: return 0;
-        }
-      case 6: // Difficulty focusing?
-        switch (answer) {
-          case 'No': return 10;
-          case 'Sometimes': return 6;
-          case 'Yes': return 2;
-          default: return 0;
-        }
-      case 7: // Social media time?
-        switch (answer) {
-          case 'Less than 1 hour': return 10;
-          case '1-3 hours': return 7;
-          case '4-6 hours': return 4;
-          case 'More than 6 hours': return 1;
-          default: return 0;
-        }
-      case 8: // Compare on social media?
-        switch (answer) {
-          case 'Never': return 10;
-          case 'Rarely': return 7;
-          case 'Sometimes': return 4;
-          case 'Often': return 1;
-          default: return 0;
-        }
-      case 9: // Anxious without phone?
-        switch (answer) {
-          case 'No': return 10;
-          case 'Sometimes': return 6;
-          case 'Yes': return 2;
-          default: return 0;
-        }
+    // Scoring for questions 2-21 (5 points max per question)
+    switch (answer) {
+      case 'Never':
+        return 5;
+      case 'Hardly ever':
+        return 4;
+      case 'Some of the time':
+        return 3;
+      case 'Most of the time':
+        return 2;
+      case 'All the time':
+        return 1;
       default:
         return 0;
     }
   }
+  Future<void> _calculateCurrentScore() async {
+    try {
+      final supabase = Supabase.instance.client;
+      final user = supabase.auth.currentUser;
+      if (user == null) {
+        print('No user logged in');
+        setState(() => _currentScore = 0);
+        return;
+      }
+
+      // Check activity entry counts
+      final journalCount = (await supabase
+          .from('journal_entries')
+          .select('id')
+          .eq('user_id', user.id)).length;
+      print('Journal entries count: $journalCount');
+
+      final exerciseCount = (await supabase
+          .from('exercise_entries')
+          .select('id')
+          .eq('user_id', user.id)).length;
+      print('Exercise entries count: $exerciseCount');
+
+      final photoCount = (await supabase
+          .from('photo_entries')
+          .select('id')
+          .eq('user_id', user.id)).length;
+      print('Photo entries count: $photoCount');
+
+      int calculatedScore;
+
+      if (journalCount == 0 && exerciseCount == 0 && photoCount == 0) {
+        print('No activity entries, calculating initial assessment score');
+        final moodEntryResponse = await supabase
+            .from('mood_entries')
+            .select('score')
+            .eq('user_id', user.id)
+            .order('timestamp', ascending: false)
+            .limit(1);
+        final moodScore = moodEntryResponse.isNotEmpty
+            ? (moodEntryResponse[0]['score'] as int? ?? 0)
+            : 0;
+        print('Mood score: $moodScore');
+
+        final responses = await supabase
+            .from('questionnaire_responses')
+            .select('question_number, answer, score')
+            .eq('user_id', user.id)
+            .gte('question_number', 2)
+            .lte('question_number', 21);
+
+        if (responses.isEmpty) {
+          print('No questionnaire responses, using mood score only');
+          calculatedScore = moodScore;
+        } else {
+          int totalQuestionScore = 0;
+          for (var response in responses) {
+            final questionNumber = response['question_number'] as int;
+            final answer = response['answer'] as String;
+            final score = response['score'] as int? ?? _calculateQuestionScore(questionNumber, answer);
+            totalQuestionScore += score;
+          }
+          print('Total question score: $totalQuestionScore from ${responses.length} responses');
+          calculatedScore = ((moodScore + totalQuestionScore) / 2).round();
+          print('Initial calculated score: $calculatedScore');
+        }
+      } else {
+        print('Calculating score from activity moods');
+        // Fetch latest moods from all three sources
+        final journalMoodResponse = await supabase
+            .from('journal_entries')
+            .select('mood')
+            .eq('user_id', user.id)
+            .order('timestamp', ascending: false)
+            .limit(1);
+        final journalMood = journalMoodResponse.isNotEmpty
+            ? journalMoodResponse[0]['mood'] as String?
+            : null;
+        print('Latest journal mood: $journalMood');
+
+        final exerciseMoodResponse = await supabase
+            .from('exercise_entries')
+            .select('mood')
+            .eq('user_id', user.id)
+            .order('timestamp', ascending: false)
+            .limit(1);
+        final exerciseMood = exerciseMoodResponse.isNotEmpty
+            ? exerciseMoodResponse[0]['mood'] as String?
+            : null;
+        print('Latest exercise mood: $exerciseMood');
+
+        final photoMoodResponse = await supabase
+            .from('photo_entries')
+            .select('mood')
+            .eq('user_id', user.id)
+            .order('timestamp', ascending: false)
+            .limit(1);
+        final photoMood = photoMoodResponse.isNotEmpty
+            ? photoMoodResponse[0]['mood'] as String?
+            : null;
+        print('Latest photo mood: $photoMood');
+
+        int moodValue1 = _getMoodValue(journalMood);
+        int moodValue2 = _getMoodValue(exerciseMood);
+        int moodValue3 = _getMoodValue(photoMood);
+        print('Mood values - Journal: $moodValue1, Exercise: $moodValue2, Photo: $moodValue3');
+
+        double averageMood = (moodValue1 + moodValue2 + moodValue3) / 3.0;
+        calculatedScore = ((averageMood - 1) / 4 * 100).round();
+        print('Average mood: $averageMood, Activity-based score: $calculatedScore');
+      }
+
+      setState(() {
+        _currentScore = calculatedScore;
+        print('Updated _currentScore to: $_currentScore');
+      });
+    } catch (e) {
+      print('Error calculating current score: $e');
+      setState(() {
+        _currentScore = 0;
+      });
+    }
+  }
+  int _getMoodValue(String? mood) {
+    if (mood == null) return 3; // Default to Neutral if null
+    String normalizedMood = mood.trim().toLowerCase();
+    switch (normalizedMood) {
+      case 'sad': return 1;
+      case 'angry': return 2;
+      case 'neutral': return 3;
+      case 'happy': return 4;
+      case 'very happy': return 5;
+      case 'anxious, depressed': return 1; // From ScorePage
+      default:
+        print('Unknown mood: $mood, defaulting to 3');
+        return 3; // Default to Neutral
+    }
+  }
+  String _getMoodFromScore(int score) {
+    if (score >= 81) return 'Very Happy';
+    else if (score >= 61) return 'Happy';
+    else if (score >= 41) return 'Neutral';
+    else if (score >= 21) return 'Sad';
+    else return 'Anxious, Depressed';
+  }
 
   String _getScoreMessage(int score) {
-    if (score >= 80) {
-      return 'Great job! Your mental health is thriving.';
-    } else if (score >= 60) {
-      return 'Good effort! You’re on a healthy path.';
-    } else if (score >= 40) {
-      return 'Take some time to focus on self-care.';
+    if (score >= 81) {
+      return 'Excellent! Your mental health is thriving.';
+    } else if (score >= 61) {
+      return 'Good job! You’re on a healthy path.';
+    } else if (score >= 41) {
+      return 'Fair. Consider some self-care practices.';
+    } else if (score >= 21) {
+      return 'Needs attention. Seek support if needed.';
     } else {
-      return 'Consider seeking support for your mental well-being.';
+      return 'Critical. Please consult a professional.';
     }
+  }
+
+  Color _getScoreColor(int score) {
+    if (score >= 81) return Colors.green;
+    else if (score >= 61) return Colors.lightGreen;
+    else if (score >= 41) return Colors.yellow;
+    else if (score >= 21) return Colors.orange;
+    else return Colors.red;
   }
 
   @override
@@ -198,6 +427,22 @@ class _ScorePageState extends State<ScorePage> {
                         ),
                         textAlign: TextAlign.center,
                       ),
+                      const SizedBox(height: 10),
+                      ElevatedButton(onPressed: (){
+                        Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => GraphPage()));
+                      },
+                        style: ElevatedButton.styleFrom(
+                        elevation: 0.1,
+
+                          shape: RoundedRectangleBorder(
+
+                            borderRadius: BorderRadius.circular(32),
+                          ),
+                        ),
+
+                          child: Text('Check your Daily Data', style: TextStyle(color: Color(0xff9bb068),fontWeight: FontWeight.bold, fontSize: 16)),
+
+                      ),
                     ],
                   ),
                 ),
@@ -237,32 +482,41 @@ class _ScorePageState extends State<ScorePage> {
                             ),
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      entry['date'],
-                                      style: const TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                      ),
+                                Container(
+                                  color: Colors.white,
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  child: Text(
+                                    entry['date'],
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
                                     ),
-                                    Text(
-                                      entry['mood'],
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        color: Colors.grey[600],
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        entry['mood'],
+                                        style: const TextStyle(
+                                          fontSize: 13,
+                                          color: Colors.black,
+                                        ),
                                       ),
-                                    ),
-                                    Text(
-                                      entry['recommendation'],
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: Colors.grey[500],
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        entry['recommendation'],
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.grey,
+                                        ),
                                       ),
-                                    ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
                                 SizedBox(
                                   width: 50,
@@ -271,10 +525,10 @@ class _ScorePageState extends State<ScorePage> {
                                     alignment: Alignment.center,
                                     children: [
                                       CircularProgressIndicator(
-                                        value: entry['score'] / 100,
+                                        value: entry['score'] / 100, // Filled based on history score
                                         backgroundColor: Colors.grey[300],
                                         valueColor: AlwaysStoppedAnimation<Color>(
-                                          entry['score'] >= 80 ? Colors.green : Colors.orange,
+                                          _getScoreColor(entry['score']),
                                         ),
                                         strokeWidth: 6,
                                       ),
@@ -297,6 +551,8 @@ class _ScorePageState extends State<ScorePage> {
                     ],
                   ),
                 ),
+                const SizedBox(height: 70),
+                // Footer
               ],
             ),
           ),
@@ -328,6 +584,7 @@ class _ScorePageState extends State<ScorePage> {
                     isActive: true,
                     onPressed: () {
                       // Navigate to Home page
+                      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => HomePage()));
                     },
                   ),
                   _buildFooterButton(
@@ -396,4 +653,6 @@ class _ScorePageState extends State<ScorePage> {
       ],
     );
   }
+
+
 }

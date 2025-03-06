@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mindhaven/Home/profile.dart';
 import 'package:mindhaven/assessment/question1.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:mindhaven/Splash/splash_screen.dart';
@@ -9,8 +10,9 @@ import 'package:mindhaven/Home/score_page.dart';
 import 'package:mindhaven/assessment/welcome.dart';
 import 'package:mindhaven/assessment/age.dart';
 import 'package:mindhaven/assessment/gender.dart';
-import 'package:mindhaven/assessment/question1.dart';
+import 'package:mindhaven/assessment/mood_page.dart'; // Updated to use MoodPage
 import 'package:mindhaven/assessment/enter_name_page.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Supabase.initialize(
@@ -42,7 +44,7 @@ class MyApp extends StatelessWidget {
           bodyMedium: TextStyle(fontSize: 14, fontWeight: FontWeight.w400, fontFamily: 'Urbanist'),
         ),
         primaryColor: const Color(0xFF9BB168),
-        colorScheme:  ColorScheme.fromSwatch().copyWith(
+        colorScheme: ColorScheme.fromSwatch().copyWith(
           secondary: Color(0xFF926247),
         ),
       ),
@@ -55,106 +57,248 @@ class MyApp extends StatelessWidget {
         '/score': (context) => const ScorePage(),
         '/welcome': (context) => const WelcomePage(),
         '/EnterNamePage': (context) => const EnterNamePage(),
+        '/profile': (context) => const ProfilePage(),
         // Mapping question numbers to assessment pages
-        '/question1': (context) => const AgePage(), // Question 1: Age
-        '/question2': (context) => const GenderPage(), // Question 2: Gender
+        '/mood': (context) => const MoodPage(), // Question 1: Mood
+        '/question2': (context) => const QuestionPage(
+          questionNumber: 2,
+          questionText: 'I feel sad and low',
+          options: {
+            'Never': Icons.sentiment_satisfied,
+            'Hardly ever': Icons.sentiment_neutral,
+            'Some of the time': Icons.sentiment_dissatisfied,
+            'Most of the time': Icons.sentiment_very_dissatisfied,
+            'All the time': Icons.sentiment_very_dissatisfied,
+          },
+          totalQuestions: 21,
+        ),
         '/question3': (context) => const QuestionPage(
           questionNumber: 3,
-          questionText: 'How often do you struggle with anxious thoughts?',
+          questionText: 'I feel disinterested in things that earlier seemed pleasurable',
           options: {
-            'Rarely': Icons.sentiment_satisfied,
-            'Sometimes': Icons.sentiment_neutral,
-            'Often': Icons.sentiment_dissatisfied,
-            'Always': Icons.sentiment_very_dissatisfied,
+            'Never': Icons.sentiment_satisfied,
+            'Hardly ever': Icons.sentiment_neutral,
+            'Some of the time': Icons.sentiment_dissatisfied,
+            'Most of the time': Icons.sentiment_very_dissatisfied,
+            'All the time': Icons.sentiment_very_dissatisfied,
           },
-          totalQuestions: 11,
+          totalQuestions: 21,
         ),
         '/question4': (context) => const QuestionPage(
           questionNumber: 4,
-          questionText:
-          'Do you have trouble sleeping or experience frequent disturbances in your sleep?',
+          questionText: 'I feel I should be (or I am being) punished',
           options: {
-            'Yes': Icons.bedtime,
-            'No': Icons.check_circle,
-            'Sometimes': Icons.adjust,
+            'Never': Icons.sentiment_satisfied,
+            'Hardly ever': Icons.sentiment_neutral,
+            'Some of the time': Icons.sentiment_dissatisfied,
+            'Most of the time': Icons.sentiment_very_dissatisfied,
+            'All the time': Icons.sentiment_very_dissatisfied,
           },
-          totalQuestions: 11,
+          totalQuestions: 21,
         ),
         '/question5': (context) => const QuestionPage(
           questionNumber: 5,
-          questionText: 'How often do you engage in physical activity or exercise?',
+          questionText: 'I feel guilty',
           options: {
-            'Never': Icons.accessibility_new,
-            'Rarely': Icons.directions_walk,
-            'Several times a week': Icons.directions_run,
-            'Daily': Icons.fitness_center,
+            'Never': Icons.sentiment_satisfied,
+            'Hardly ever': Icons.sentiment_neutral,
+            'Some of the time': Icons.sentiment_dissatisfied,
+            'Most of the time': Icons.sentiment_very_dissatisfied,
+            'All the time': Icons.sentiment_very_dissatisfied,
           },
-          totalQuestions: 11,
+          totalQuestions: 21,
         ),
         '/question6': (context) => const QuestionPage(
           questionNumber: 6,
-          questionText: 'Do you find it difficult to focus or stay motivated in your daily tasks?',
+          questionText: 'I have difficulty making decisions',
           options: {
-            'Yes': Icons.remove_red_eye,
-            'No': Icons.check_circle,
-            'Sometimes': Icons.adjust,
+            'Never': Icons.sentiment_satisfied,
+            'Hardly ever': Icons.sentiment_neutral,
+            'Some of the time': Icons.sentiment_dissatisfied,
+            'Most of the time': Icons.sentiment_very_dissatisfied,
+            'All the time': Icons.sentiment_very_dissatisfied,
           },
-          totalQuestions: 11,
+          totalQuestions: 21,
         ),
         '/question7': (context) => const QuestionPage(
           questionNumber: 7,
-          questionText: 'How much time do you spend on social media daily?',
+          questionText: 'I feel tired and low on energy',
           options: {
-            'Less than 1 hour': Icons.access_time,
-            '1-3 hours': Icons.schedule,
-            '4-6 hours': Icons.timer,
-            'More than 6 hours': Icons.watch_later,
+            'Never': Icons.sentiment_satisfied,
+            'Hardly ever': Icons.sentiment_neutral,
+            'Some of the time': Icons.sentiment_dissatisfied,
+            'Most of the time': Icons.sentiment_very_dissatisfied,
+            'All the time': Icons.sentiment_very_dissatisfied,
           },
-          totalQuestions: 11,
+          totalQuestions: 21,
         ),
         '/question8': (context) => const QuestionPage(
           questionNumber: 8,
-          questionText: 'How often do you compare yourself to others on social media?',
+          questionText: 'I believe that nothing will ever work out for me',
           options: {
             'Never': Icons.sentiment_satisfied,
-            'Rarely': Icons.sentiment_neutral,
-            'Sometimes': Icons.sentiment_dissatisfied,
-            'Often': Icons.sentiment_very_dissatisfied,
+            'Hardly ever': Icons.sentiment_neutral,
+            'Some of the time': Icons.sentiment_dissatisfied,
+            'Most of the time': Icons.sentiment_very_dissatisfied,
+            'All the time': Icons.sentiment_very_dissatisfied,
           },
-          totalQuestions: 11,
+          totalQuestions: 21,
         ),
         '/question9': (context) => const QuestionPage(
           questionNumber: 9,
-          questionText:
-          'Do you feel anxious or uneasy when you don’t check your phone for a long time?',
+          questionText: 'I have difficulty concentrating',
           options: {
-            'Yes': Icons.phone_missed,
-            'No': Icons.check_circle,
-            'Sometimes': Icons.adjust,
+            'Never': Icons.sentiment_satisfied,
+            'Hardly ever': Icons.sentiment_neutral,
+            'Some of the time': Icons.sentiment_dissatisfied,
+            'Most of the time': Icons.sentiment_very_dissatisfied,
+            'All the time': Icons.sentiment_very_dissatisfied,
           },
-          totalQuestions: 11,
+          totalQuestions: 21,
         ),
         '/question10': (context) => const QuestionPage(
           questionNumber: 10,
-          questionText:
-          'Do you worry about financial stability or managing expenses? ',
+          questionText: 'I feel irritated',
           options: {
-            'Yes': Icons.remove_red_eye,
-            'No': Icons.check_circle,
-            'Sometimes': Icons.adjust,
+            'Never': Icons.sentiment_satisfied,
+            'Hardly ever': Icons.sentiment_neutral,
+            'Some of the time': Icons.sentiment_dissatisfied,
+            'Most of the time': Icons.sentiment_very_dissatisfied,
+            'All the time': Icons.sentiment_very_dissatisfied,
           },
-          totalQuestions: 11,
+          totalQuestions: 21,
         ),
         '/question11': (context) => const QuestionPage(
           questionNumber: 11,
-          questionText:
-          'Are you stressed about your future career or life goals?',
+          questionText: 'I feel restless and anxious',
           options: {
-            'Yes': Icons.remove_red_eye,
-            'No': Icons.check_circle,
-            'Sometimes': Icons.adjust,
+            'Never': Icons.sentiment_satisfied,
+            'Hardly ever': Icons.sentiment_neutral,
+            'Some of the time': Icons.sentiment_dissatisfied,
+            'Most of the time': Icons.sentiment_very_dissatisfied,
+            'All the time': Icons.sentiment_very_dissatisfied,
           },
-          totalQuestions: 11,
+          totalQuestions: 21,
+        ),
+        '/question12': (context) => const QuestionPage(
+          questionNumber: 12,
+          questionText: 'I cry (or I feel like crying)',
+          options: {
+            'Never': Icons.sentiment_satisfied,
+            'Hardly ever': Icons.sentiment_neutral,
+            'Some of the time': Icons.sentiment_dissatisfied,
+            'Most of the time': Icons.sentiment_very_dissatisfied,
+            'All the time': Icons.sentiment_very_dissatisfied,
+          },
+          totalQuestions: 21,
+        ),
+        '/question13': (context) => const QuestionPage(
+          questionNumber: 13,
+          questionText: 'I have thoughts about ending my life',
+          options: {
+            'Never': Icons.sentiment_satisfied,
+            'Hardly ever': Icons.sentiment_neutral,
+            'Some of the time': Icons.sentiment_dissatisfied,
+            'Most of the time': Icons.sentiment_very_dissatisfied,
+            'All the time': Icons.sentiment_very_dissatisfied,
+          },
+          totalQuestions: 21,
+        ),
+        '/question14': (context) => const QuestionPage(
+          questionNumber: 14,
+          questionText: 'I feel like a failure',
+          options: {
+            'Never': Icons.sentiment_satisfied,
+            'Hardly ever': Icons.sentiment_neutral,
+            'Some of the time': Icons.sentiment_dissatisfied,
+            'Most of the time': Icons.sentiment_very_dissatisfied,
+            'All the time': Icons.sentiment_very_dissatisfied,
+          },
+          totalQuestions: 21,
+        ),
+        '/question15': (context) => const QuestionPage(
+          questionNumber: 15,
+          questionText: 'I feel like I am alone (or want to be alone)',
+          options: {
+            'Never': Icons.sentiment_satisfied,
+            'Hardly ever': Icons.sentiment_neutral,
+            'Some of the time': Icons.sentiment_dissatisfied,
+            'Most of the time': Icons.sentiment_very_dissatisfied,
+            'All the time': Icons.sentiment_very_dissatisfied,
+          },
+          totalQuestions: 21,
+        ),
+        '/question16': (context) => const QuestionPage(
+          questionNumber: 16,
+          questionText: 'It takes me a lot of effort to do the smallest of things',
+          options: {
+            'Never': Icons.sentiment_satisfied,
+            'Hardly ever': Icons.sentiment_neutral,
+            'Some of the time': Icons.sentiment_dissatisfied,
+            'Most of the time': Icons.sentiment_very_dissatisfied,
+            'All the time': Icons.sentiment_very_dissatisfied,
+          },
+          totalQuestions: 21,
+        ),
+        '/question17': (context) => const QuestionPage(
+          questionNumber: 17,
+          questionText: 'I feel helpless',
+          options: {
+            'Never': Icons.sentiment_satisfied,
+            'Hardly ever': Icons.sentiment_neutral,
+            'Some of the time': Icons.sentiment_dissatisfied,
+            'Most of the time': Icons.sentiment_very_dissatisfied,
+            'All the time': Icons.sentiment_very_dissatisfied,
+          },
+          totalQuestions: 21,
+        ),
+        '/question18': (context) => const QuestionPage(
+          questionNumber: 18,
+          questionText: 'I don’t feel happy even when good things happen',
+          options: {
+            'Never': Icons.sentiment_satisfied,
+            'Hardly ever': Icons.sentiment_neutral,
+            'Some of the time': Icons.sentiment_dissatisfied,
+            'Most of the time': Icons.sentiment_very_dissatisfied,
+            'All the time': Icons.sentiment_very_dissatisfied,
+          },
+          totalQuestions: 21,
+        ),
+        '/question19': (context) => const QuestionPage(
+          questionNumber: 19,
+          questionText: 'I think my life isn’t worth living',
+          options: {
+            'Never': Icons.sentiment_satisfied,
+            'Hardly ever': Icons.sentiment_neutral,
+            'Some of the time': Icons.sentiment_dissatisfied,
+            'Most of the time': Icons.sentiment_very_dissatisfied,
+            'All the time': Icons.sentiment_very_dissatisfied,
+          },
+          totalQuestions: 21,
+        ),
+        '/question20': (context) => const QuestionPage(
+          questionNumber: 20,
+          questionText: 'I am eating significantly more (or less) than usual',
+          options: {
+            'Never': Icons.sentiment_satisfied,
+            'Hardly ever': Icons.sentiment_neutral,
+            'Some of the time': Icons.sentiment_dissatisfied,
+            'Most of the time': Icons.sentiment_very_dissatisfied,
+            'All the time': Icons.sentiment_very_dissatisfied,
+          },
+          totalQuestions: 21,
+        ),
+        '/question21': (context) => const QuestionPage(
+          questionNumber: 21,
+          questionText: 'My sleep is disturbed (unrestful or broken sleep)',
+          options: {
+            'Never': Icons.sentiment_satisfied,
+            'Hardly ever': Icons.sentiment_neutral,
+            'Some of the time': Icons.sentiment_dissatisfied,
+            'Most of the time': Icons.sentiment_very_dissatisfied,
+            'All the time': Icons.sentiment_very_dissatisfied,
+          },
+          totalQuestions: 21,
         ),
         // Add '/result' route later
       },

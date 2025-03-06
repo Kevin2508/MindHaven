@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-
+import 'package:mindhaven/assessment/mood_page.dart';
 class GenderPage extends StatefulWidget {
   const GenderPage({Key? key}) : super(key: key);
 
@@ -39,7 +39,7 @@ class _GenderPageState extends State<GenderPage> {
           const SnackBar(content: Text('Gender stored successfully!')),
         );
       }
-      Navigator.pushReplacementNamed(context, '/question3');
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => MoodPage()));
     } on PostgrestException catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Postgrest Error: ${e.message} (Code: ${e.code}, Details: ${e.details})')),

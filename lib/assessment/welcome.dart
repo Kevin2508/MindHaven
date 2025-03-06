@@ -57,21 +57,21 @@ class _WelcomePageState extends State<WelcomePage> {
                         title: 'Welcome to MindHaven',
                         description:
                         'Your journey to better mental health starts here. Take our assessment to understand your needs.',
-                        imagePath: 'assets/images/welcome1.png',
+                        imagePath: 'assets/images/angel.png',
                         orientation: orientation,
                       ),
                       _buildPage(
                         title: 'Personalized Insights',
                         description:
                         'Get tailored recommendations based on your responses to improve your well-being.',
-                        imagePath: 'assets/images/welcome2.png',
+                        imagePath: 'assets/images/great.png',
                         orientation: orientation,
                       ),
                       _buildPage(
                         title: 'Start Your Journey',
                         description:
                         'Click below to begin the assessment and take the first step towards a healthier you.',
-                        imagePath: 'assets/images/welcome3.png',
+                        imagePath: 'assets/images/Meditate.png',
                         orientation: orientation,
                       ),
                     ],

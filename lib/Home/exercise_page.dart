@@ -73,39 +73,10 @@ class _ExercisePageState extends State<ExercisePage> {
         builder: (context) => StressReliefPage(audioTitle: entry['title'], audioFile: entry['file']),
       ),
     );
-    // Prompt for mood after audio
-    String? selectedMood = await _showMoodDialog();
-    if (selectedMood != null) {
-      final supabase = Supabase.instance.client;
-      final user = supabase.auth.currentUser;
-      if (user != null) {
-        await supabase.from('exercise_entries').insert({
-          'user_id': user.id,
-          'mood': selectedMood,
-          'timestamp': DateTime.now().toIso8601String(),
-        });
-      }
-    }
+    // Reload total time after returning from StressReliefPage
     await _loadTotalTime();
-    Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => HomePage()));
   }
-  Future<String?> _showMoodDialog() async {
-    return showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('How do you feel?'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: ['Sad', 'Angry', 'Neutral', 'Happy', 'Very Happy'].map((mood) {
-            return ListTile(
-              title: Text(mood),
-              onTap: () => Navigator.pop(context, mood),
-            );
-          }).toList(),
-        ),
-      ),
-    );
-  }
+
   void _goToHomePage() {
     Navigator.pushReplacement(
       context,
@@ -118,20 +89,8 @@ class _ExercisePageState extends State<ExercisePage> {
       context,
       MaterialPageRoute(builder: (context) => const BreathingExercisePage()),
     );
-    String? selectedMood = await _showMoodDialog();
-    if (selectedMood != null) {
-      final supabase = Supabase.instance.client;
-      final user = supabase.auth.currentUser;
-      if (user != null) {
-        await supabase.from('exercise_entries').insert({
-          'user_id': user.id,
-          'mood': selectedMood,
-          'timestamp': DateTime.now().toIso8601String(),
-        });
-      }
-    }
+    // Reload total time after returning from BreathingExercisePage
     await _loadTotalTime();
-    Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => HomePage()));
   }
 
   @override

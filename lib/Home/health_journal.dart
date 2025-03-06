@@ -1,14 +1,13 @@
+
+
 import 'package:flutter/material.dart';
-import 'package:mindhaven/Home/daily_journal.dart';
 import 'package:mindhaven/Home/home_page.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 import 'package:mindhaven/Home/new_journal_entry.dart';
 
 class HealthJournalPage extends StatefulWidget {
-
-   HealthJournalPage({super.key});
-
+  const HealthJournalPage({super.key});
 
   @override
   _HealthJournalPageState createState() => _HealthJournalPageState();
@@ -17,7 +16,6 @@ class HealthJournalPage extends StatefulWidget {
 class _HealthJournalPageState extends State<HealthJournalPage> {
   List<Map<String, dynamic>> _journalData = [];
   int _totalEntriesThisYear = 0;
-  int streakCount = 0;
 
   @override
   void initState() {
@@ -25,98 +23,48 @@ class _HealthJournalPageState extends State<HealthJournalPage> {
     _loadJournalData();
   }
 
-
   Future<void> _loadJournalData() async {
     try {
       final supabase = Supabase.instance.client;
       final user = supabase.auth.currentUser;
       if (user != null) {
-        // ... existing journal loading logic ...
+        final now = DateTime.now();
+        final thirtyDaysAgo = now.subtract(const Duration(days: 30));
 
-        await _calculateStreak(); // Calculate streak after loading journal data
+        // Load last 30 days entries for mood visualization
+        final history = await supabase
+            .from('journal_entries')
+            .select('mood, timestamp, title')
+            .eq('user_id', user.id)
+            .gte('timestamp', thirtyDaysAgo.toIso8601String())
+            .order('timestamp', ascending: false);
+
+        // Get all entries for this year
+        final startOfYear = DateTime(now.year, 1, 1);
+        final yearEntries = await supabase
+            .from('journal_entries')
+            .select('timestamp')
+            .eq('user_id', user.id)
+            .gte('timestamp', startOfYear.toIso8601String());
+
+        // Count unique days with entries
+        final uniqueDays = <String>{};
+        for (var entry in yearEntries) {
+          final date = DateTime.parse(entry['timestamp'] as String);
+          uniqueDays.add(DateFormat('yyyy-MM-dd').format(date));
+        }
+
+        setState(() {
+          _journalData = List<Map<String, dynamic>>.from(history);
+          _totalEntriesThisYear = uniqueDays.length; // Number of unique days
+        });
       }
     } catch (e) {
       setState(() {
         _journalData = [];
         _totalEntriesThisYear = 0;
-         streakCount = 0;
       });
     }
-  }
-
-  Future<void> _calculateStreak() async {
-    final supabase = Supabase.instance.client;
-    final user = supabase.auth.currentUser;
-    if (user == null) return;
-
-    DateTime today = DateTime.now().toUtc();
-    DateTime startOfToday = DateTime(today.year, today.month, today.day);
-    int streak = 0;
-
-    final journalToday = await supabase
-        .from('journal_entries')
-        .select('id')
-        .eq('user_id', user.id)
-        .gte('timestamp', startOfToday.toIso8601String())
-        .lt('timestamp', startOfToday.add(Duration(days: 1)).toIso8601String());
-
-    final exerciseToday = await supabase
-        .from('exercise_entries')
-        .select('id')
-        .eq('user_id', user.id)
-        .gte('timestamp', startOfToday.toIso8601String())
-        .lt('timestamp', startOfToday.add(Duration(days: 1)).toIso8601String());
-
-    final photoToday = await supabase
-        .from('photo_entries')
-        .select('id')
-        .eq('user_id', user.id)
-        .gte('timestamp', startOfToday.toIso8601String())
-        .lt('timestamp', startOfToday.add(Duration(days: 1)).toIso8601String());
-
-    if (journalToday.isNotEmpty && exerciseToday.isNotEmpty && photoToday.isNotEmpty) {
-      streak += 1;
-    } else {
-      setState(() {
-        streakCount = streak;
-      });
-      return;
-    }
-
-    DateTime checkDay = startOfToday.subtract(Duration(days: 1));
-    while (true) {
-      final journalCheck = await supabase
-          .from('journal_entries')
-          .select('id')
-          .eq('user_id', user.id)
-          .gte('timestamp', checkDay.toIso8601String())
-          .lt('timestamp', checkDay.add(Duration(days: 1)).toIso8601String());
-
-      final exerciseCheck = await supabase
-          .from('exercise_entries')
-          .select('id')
-          .eq('user_id', user.id)
-          .gte('timestamp', checkDay.toIso8601String())
-          .lt('timestamp', checkDay.add(Duration(days: 1)).toIso8601String());
-
-      final photoCheck = await supabase
-          .from('photo_entries')
-          .select('id')
-          .eq('user_id', user.id)
-          .gte('timestamp', checkDay.toIso8601String())
-          .lt('timestamp', checkDay.add(Duration(days: 1)).toIso8601String());
-
-      if (journalCheck.isNotEmpty && exerciseCheck.isNotEmpty && photoCheck.isNotEmpty) {
-        streak += 1;
-        checkDay = checkDay.subtract(Duration(days: 1));
-      } else {
-        break;
-      }
-    }
-
-    setState(() {
-      streakCount = streak;
-    });
   }
   void _addNewJournal() {
     Navigator.push(
@@ -201,7 +149,7 @@ class _HealthJournalPageState extends State<HealthJournalPage> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                       IconButton(
+                      IconButton(
                         icon: Icon(Icons.arrow_back),
                         onPressed: (){
                           Navigator.pushReplacement(
@@ -210,7 +158,7 @@ class _HealthJournalPageState extends State<HealthJournalPage> {
                           );
                         },
 
-                           // You can implement back navigation if needed
+                        // You can implement back navigation if needed
                       ),
                       const Text(
                         'Health Journal',
@@ -305,12 +253,6 @@ class _HealthJournalPageState extends State<HealthJournalPage> {
                           Text('Positive', style: TextStyle(color: Colors.green)),
                         ],
                       ),
-                      ElevatedButton(onPressed: (){
-                        Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(builder: (context) => const JournalPage()),
-                        );
-                      }, child: Text('Check Journals'))
                     ],
                   ),
                 ),

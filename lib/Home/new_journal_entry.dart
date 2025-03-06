@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:mindhaven/Home/home_page.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:mindhaven/Home/daily_journal.dart';
 
@@ -52,6 +51,7 @@ class _NewJournalEntryPageState extends State<NewJournalEntryPage> {
       final user = supabase.auth.currentUser;
       if (user != null && _titleController.text.isNotEmpty && _entryController.text.isNotEmpty) {
         if (widget.isEditing && widget.journalData != null) {
+          // Update existing entry
           await supabase
               .from('journal_entries')
               .update({
@@ -62,6 +62,7 @@ class _NewJournalEntryPageState extends State<NewJournalEntryPage> {
           })
               .eq('id', widget.journalData!['id']);
         } else {
+          // Create new entry
           await supabase.from('journal_entries').insert({
             'user_id': user.id,
             'mood': _selectedEmotion,
@@ -70,8 +71,12 @@ class _NewJournalEntryPageState extends State<NewJournalEntryPage> {
             'timestamp': DateTime.now().toIso8601String(),
           });
         }
+
         if (mounted) {
-          Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => HomePage()));
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const JournalPage()),
+          );
         }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(

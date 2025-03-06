@@ -9,7 +9,6 @@ import 'package:intl/intl.dart';
 import 'package:mindhaven/Home/daily_journal.dart';
 import 'package:mindhaven/Home/mindfulhours.dart';
 import 'package:mindhaven/Community/welcome.dart';
-import 'package:pie_chart/pie_chart.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -21,10 +20,11 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   String? userName = 'User';
   String? profileImageUrl = 'https://via.placeholder.com/64';
-  int streakCount = 0; // Start at 0 for new users
+  int streakCount = 0;
   int notifications = 3;
   bool _isProfileComplete = false;
-  int _currentScore = 0; // Will be updated dynamically
+  int _currentScore = 0;
+
   Future<void> _calculateStreak() async {
     final supabase = Supabase.instance.client;
     final user = supabase.auth.currentUser;
@@ -34,7 +34,6 @@ class _HomePageState extends State<HomePage> {
     DateTime startOfToday = DateTime(today.year, today.month, today.day);
     int streak = 0;
 
-    // Check today
     final journalToday = await supabase
         .from('journal_entries')
         .select('id')
@@ -59,14 +58,12 @@ class _HomePageState extends State<HomePage> {
     if (journalToday.isNotEmpty && exerciseToday.isNotEmpty && photoToday.isNotEmpty) {
       streak += 1;
     } else {
-      // If today isn't complete, streak is 0
       setState(() {
         streakCount = streak;
       });
       return;
     }
 
-    // Check previous days
     DateTime checkDay = startOfToday.subtract(Duration(days: 1));
     while (true) {
       final journalCheck = await supabase
@@ -102,6 +99,7 @@ class _HomePageState extends State<HomePage> {
       streakCount = streak;
     });
   }
+
   @override
   void initState() {
     super.initState();
@@ -114,7 +112,7 @@ class _HomePageState extends State<HomePage> {
           );
         });
       } else {
-        _calculateCurrentScore(); // Calculate score only if assessment is complete
+        _calculateCurrentScore(); // Now matches ScorePage logic
         _calculateStreak();
       }
     });
@@ -155,136 +153,29 @@ class _HomePageState extends State<HomePage> {
     try {
       final supabase = Supabase.instance.client;
       final user = supabase.auth.currentUser;
-      if (user == null) {
-        print('No user logged in');
-        setState(() => _currentScore = 0);
-        return;
-      }
-
-      // Check activity entry counts
-      final journalCount = (await supabase
-          .from('journal_entries')
-          .select('id')
-          .eq('user_id', user.id)).length;
-      print('Journal entries count: $journalCount');
-
-      final exerciseCount = (await supabase
-          .from('exercise_entries')
-          .select('id')
-          .eq('user_id', user.id)).length;
-      print('Exercise entries count: $exerciseCount');
-
-      final photoCount = (await supabase
-          .from('photo_entries')
-          .select('id')
-          .eq('user_id', user.id)).length;
-      print('Photo entries count: $photoCount');
-
-      if (journalCount == 0 && exerciseCount == 0 && photoCount == 0) {
-        print('No activity entries, using initial assessment score');
-        // Fetch mood score (consistent with ScorePage)
-        final moodEntryResponse = await supabase
-            .from('mood_entries')
+      if (user != null) {
+        // Fetch the latest score from mental_score_history
+        final latestScoreEntry = await supabase
+            .from('mental_score_history')
             .select('score')
             .eq('user_id', user.id)
             .order('timestamp', ascending: false)
-            .limit(1);
-        final moodScore = moodEntryResponse.isNotEmpty
-            ? (moodEntryResponse[0]['score'] as int? ?? 0)
-            : 0;
-        print('Mood score: $moodScore');
-
-        // Fetch questionnaire responses (questions 2-21, like ScorePage)
-        final responses = await supabase
-            .from('questionnaire_responses')
-            .select('question_number, answer, score')
-            .eq('user_id', user.id)
-            .gte('question_number', 2)
-            .lte('question_number', 21);
-
-        if (responses.isEmpty) {
-          print('No questionnaire responses found');
-          setState(() => _currentScore = moodScore);
-          return;
-        }
-
-        int totalQuestionScore = 0;
-        for (var response in responses) {
-          final questionNumber = response['question_number'] as int;
-          final answer = response['answer'] as String;
-          final score = response['score'] as int? ?? _calculateQuestionScore(questionNumber, answer);
-          totalQuestionScore += score;
-        }
-        print('Total question score: $totalQuestionScore from ${responses.length} responses');
-
-        // Combine mood and question scores (match ScorePage logic)
-        final combinedScore = (moodScore + totalQuestionScore) / 2;
-        print('Initial combined score: $combinedScore');
+            .limit(1)
+            .single();
 
         setState(() {
-          _currentScore = combinedScore.round();
-        });
-      } else {
-        print('Calculating score from activity moods');
-        // Fetch latest moods
-        final journalMoodResponse = await supabase
-            .from('journal_entries')
-            .select('mood')
-            .eq('user_id', user.id)
-            .order('timestamp', ascending: false)
-            .limit(1);
-        final journalMood = journalMoodResponse.isNotEmpty
-            ? journalMoodResponse[0]['mood'] as String?
-            : null;
-        print('Latest journal mood: $journalMood');
-
-        final exerciseMoodResponse = await supabase
-            .from('exercise_entries')
-            .select('mood')
-            .eq('user_id', user.id)
-            .order('timestamp', ascending: false)
-            .limit(1);
-        final exerciseMood = exerciseMoodResponse.isNotEmpty
-            ? exerciseMoodResponse[0]['mood'] as String?
-            : null;
-        print('Latest exercise mood: $exerciseMood');
-
-        final photoMoodResponse = await supabase
-            .from('photo_entries')
-            .select('mood')
-            .eq('user_id', user.id)
-            .order('timestamp', ascending: false)
-            .limit(1);
-        final photoMood = photoMoodResponse.isNotEmpty
-            ? photoMoodResponse[0]['mood'] as String?
-            : null;
-        print('Latest photo mood: $photoMood');
-
-        // Calculate mood values
-        int moodValue1 = _getMoodValue(journalMood);
-        int moodValue2 = _getMoodValue(exerciseMood);
-        int moodValue3 = _getMoodValue(photoMood);
-        print('Mood values - Journal: $moodValue1, Exercise: $moodValue2, Photo: $moodValue3');
-
-        // Average and scale to 0-100
-        double averageMood = (moodValue1 + moodValue2 + moodValue3) / 3.0;
-        int newScore = ((averageMood - 1) / 4 * 100).round();
-        print('Average mood: $averageMood, Activity-based score: $newScore');
-
-        setState(() {
-          _currentScore = newScore;
+          _currentScore = latestScoreEntry['score'] as int? ?? 0;
         });
       }
     } catch (e) {
-      print('Error calculating current score: $e');
+      print('Error fetching score from history: $e');
       setState(() {
         _currentScore = 0;
       });
     }
   }
-
   int _calculateQuestionScore(int questionNumber, String answer) {
-    // Matching ScorePage's scoring logic for questions 2-21
+    // Exact same logic as ScorePage
     switch (answer) {
       case 'Never':
         return 5;
@@ -298,20 +189,6 @@ class _HomePageState extends State<HomePage> {
         return 1;
       default:
         return 0;
-    }
-  }
-  int _getMoodValue(String? mood) {
-    if (mood == null) return 3; // Default to Neutral if null
-    String normalizedMood = mood.trim().toLowerCase();
-    switch (normalizedMood) {
-      case 'very sad': return 1;
-      case 'sad': return 2;
-      case 'neutral': return 3;
-      case 'happy': return 4;
-      case 'very happy': return 5;
-      default:
-        print('Unknown mood: $mood, defaulting to 3');
-        return 3; // Default to Neutral
     }
   }
 
@@ -340,7 +217,6 @@ class _HomePageState extends State<HomePage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Top section (unchanged)
                           Container(
                             padding: EdgeInsets.symmetric(
                               vertical: MediaQuery.of(context).size.height * 0.02,
@@ -448,7 +324,6 @@ class _HomePageState extends State<HomePage> {
                                             const Icon(Icons.local_fire_department, size: 20),
                                             SizedBox(width: MediaQuery.of(context).size.width * 0.01),
                                             Text('$streakCount'),
-
                                           ],
                                         ),
                                       ],
@@ -525,7 +400,6 @@ class _HomePageState extends State<HomePage> {
                                   ),
                                 ),
                                 SizedBox(width: MediaQuery.of(context).size.width * 0.03),
-
                                 Padding(
                                   padding: EdgeInsets.only(
                                     right: MediaQuery.of(context).size.width * 0.03,
@@ -585,11 +459,10 @@ class _HomePageState extends State<HomePage> {
                                       );
                                     },
                                   ),
-
                                   _buildTrackerButton(
                                     icon: Icons.book,
                                     title: 'Mindful Journal',
-                                    value: '$streakCount Day Streak', // Use overall streak
+                                    value: '$streakCount Day Streak',
                                     color: Colors.orange,
                                     orientation: orientation,
                                     onPressed: () {
@@ -680,7 +553,9 @@ class _HomePageState extends State<HomePage> {
               _buildFooterButton(
                 icon: Icons.camera,
                 isActive: false,
-                onPressed: () {Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => PhotoJournalPage()));},
+                onPressed: () {
+                  Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => PhotoJournalPage()));
+                },
               ),
               _buildFooterButton(
                 icon: Icons.timelapse_rounded,
@@ -725,7 +600,7 @@ class _HomePageState extends State<HomePage> {
       child: ElevatedButton(
         onPressed: onPressed,
         style: ElevatedButton.styleFrom(
-          backgroundColor: color, // Button background (e.g., 0xFF9BB068 for Score)
+          backgroundColor: color,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(MediaQuery.of(context).size.width * 0.04),
           ),
@@ -734,31 +609,12 @@ class _HomePageState extends State<HomePage> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             if (isScoreButton)
-              SizedBox(
-                width: 120, // Outer radius
-                height: 120, // Outer radius
-                child: PieChart(
-                  dataMap: {
-                    'Score': _currentScore.toDouble(),
-                    'Remaining': 100 - _currentScore.toDouble(),
-                  },
-                  chartRadius: 60, // Half of the size for a mini pie chart
-                  chartType: ChartType.ring,
-                  ringStrokeWidth: 20, // Inner radius of the ring
-                  colorList: [
-                    Colors.white, // Filled portion (Score)
-                    Colors.transparent, // Unfilled portion (Remaining), shows button background
-                  ],
-                  legendOptions: const LegendOptions(showLegends: false), // Hide legend
-                  chartValuesOptions: const ChartValuesOptions(
-                    showChartValues: false, // Hide numerical values on the chart
-                  ),
-                  centerText: _currentScore.toString(),
-                  centerTextStyle: TextStyle(
-                    fontSize: orientation == Orientation.portrait ? 40 : 34,
-                    color: const Color(0xFF9BB068), // Green text for score
-                    fontWeight: FontWeight.bold,
-                  ),
+              Text(
+                _currentScore.toString(),
+                style: TextStyle(
+                  fontSize: orientation == Orientation.portrait ? 50 : 40,
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
                 ),
               )
             else

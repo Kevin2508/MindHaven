@@ -27,98 +27,46 @@ class _ScorePageState extends State<ScorePage> {
       final supabase = Supabase.instance.client;
       final user = supabase.auth.currentUser;
       if (user != null) {
-        // Check activity entry counts
-        final journalCount = (await supabase
-            .from('journal_entries')
-            .select('id')
-            .eq('user_id', user.id)).length;
-        final exerciseCount = (await supabase
-            .from('exercise_entries')
-            .select('id')
-            .eq('user_id', user.id)).length;
-        final photoCount = (await supabase
-            .from('photo_entries')
-            .select('id')
-            .eq('user_id', user.id)).length;
+        // Fetch mood score
+        final moodEntry = await supabase
+            .from('mood_entries')
+            .select('score')
+            .eq('user_id', user.id)
+            .order('timestamp', ascending: false)
+            .limit(1)
+            .single();
 
-        int calculatedScore;
+        final moodScore = moodEntry['score'] as int? ?? 0;
 
-        if (journalCount == 0 && exerciseCount == 0 && photoCount == 0) {
-          print('No activity entries, calculating initial assessment score');
-          final moodEntry = await supabase
-              .from('mood_entries')
-              .select('score')
-              .eq('user_id', user.id)
-              .order('timestamp', ascending: false)
-              .limit(1)
-              .maybeSingle();
-          final moodScore = moodEntry != null ? (moodEntry['score'] as int? ?? 0) : 0;
+        // Fetch question responses
+        final responses = await supabase
+            .from('questionnaire_responses')
+            .select('question_number, answer, score')
+            .eq('user_id', user.id)
+            .gte('question_number', 2)
+            .lte('question_number', 21);
 
-          final responses = await supabase
-              .from('questionnaire_responses')
-              .select('question_number, answer, score')
-              .eq('user_id', user.id)
-              .gte('question_number', 2)
-              .lte('question_number', 21);
-
-          if (responses.isEmpty) {
-            calculatedScore = moodScore;
-          } else {
-            int totalQuestionScore = 0;
-            for (var response in responses) {
-              final questionNumber = response['question_number'] as int;
-              final answer = response['answer'] as String;
-              final score = response['score'] as int? ?? _calculateQuestionScore(questionNumber, answer);
-              totalQuestionScore += score;
-            }
-            calculatedScore = ((moodScore + totalQuestionScore) / 2).round();
-          }
-        } else {
-          print('Calculating score from activity moods');
-          final journalMoodResponse = await supabase
-              .from('journal_entries')
-              .select('mood')
-              .eq('user_id', user.id)
-              .order('timestamp', ascending: false)
-              .limit(1);
-          final journalMood = journalMoodResponse.isNotEmpty
-              ? journalMoodResponse[0]['mood'] as String?
-              : null;
-
-          final exerciseMoodResponse = await supabase
-              .from('exercise_entries')
-              .select('mood')
-              .eq('user_id', user.id)
-              .order('timestamp', ascending: false)
-              .limit(1);
-          final exerciseMood = exerciseMoodResponse.isNotEmpty
-              ? exerciseMoodResponse[0]['mood'] as String?
-              : null;
-
-          final photoMoodResponse = await supabase
-              .from('photo_entries')
-              .select('mood')
-              .eq('user_id', user.id)
-              .order('timestamp', ascending: false)
-              .limit(1);
-          final photoMood = photoMoodResponse.isNotEmpty
-              ? photoMoodResponse[0]['mood'] as String?
-              : null;
-
-          int moodValue1 = _getMoodValue(journalMood);
-          int moodValue2 = _getMoodValue(exerciseMood);
-          int moodValue3 = _getMoodValue(photoMood);
-
-          double averageMood = (moodValue1 + moodValue2 + moodValue3) / 3.0;
-          calculatedScore = ((averageMood - 1) / 4 * 100).round();
+        if (responses.isEmpty) {
+          setState(() {
+            _currentScore = 0;
+          });
+          return;
         }
 
-        setState(() {
-          _currentScore = calculatedScore;
-        });
+        int totalQuestionScore = 0;
+        for (var response in responses) {
+          final questionNumber = response['question_number'] as int;
+          final answer = response['answer'] as String;
+          final score = response['score'] as int? ?? _calculateQuestionScore(questionNumber, answer);
+          totalQuestionScore += score;
+        }
 
-        // Update history (unchanged from original)
-        final today = DateFormat('dd MMM').format(DateTime.now()).toUpperCase();
+        // Combine mood score (0-100) and question score (0-100), then normalize to 0-100
+        final combinedScore = (moodScore + totalQuestionScore) / 2;
+        _currentScore = combinedScore.round();
+
+        // Save or update history for today
+        final today = DateFormat('dd MMM').format(DateTime.now()).toUpperCase(); // Format as "04 MAR"
         final existingEntry = await supabase
             .from('mental_score_history')
             .select('id')
@@ -144,6 +92,8 @@ class _ScorePageState extends State<ScorePage> {
           })
               .eq('id', existingEntry['id']);
         }
+
+        setState(() {});
       }
     } catch (e) {
       print('Error calculating score: $e');
@@ -190,144 +140,7 @@ class _ScorePageState extends State<ScorePage> {
         return 0;
     }
   }
-  Future<void> _calculateCurrentScore() async {
-    try {
-      final supabase = Supabase.instance.client;
-      final user = supabase.auth.currentUser;
-      if (user == null) {
-        print('No user logged in');
-        setState(() => _currentScore = 0);
-        return;
-      }
 
-      // Check activity entry counts
-      final journalCount = (await supabase
-          .from('journal_entries')
-          .select('id')
-          .eq('user_id', user.id)).length;
-      print('Journal entries count: $journalCount');
-
-      final exerciseCount = (await supabase
-          .from('exercise_entries')
-          .select('id')
-          .eq('user_id', user.id)).length;
-      print('Exercise entries count: $exerciseCount');
-
-      final photoCount = (await supabase
-          .from('photo_entries')
-          .select('id')
-          .eq('user_id', user.id)).length;
-      print('Photo entries count: $photoCount');
-
-      int calculatedScore;
-
-      if (journalCount == 0 && exerciseCount == 0 && photoCount == 0) {
-        print('No activity entries, calculating initial assessment score');
-        final moodEntryResponse = await supabase
-            .from('mood_entries')
-            .select('score')
-            .eq('user_id', user.id)
-            .order('timestamp', ascending: false)
-            .limit(1);
-        final moodScore = moodEntryResponse.isNotEmpty
-            ? (moodEntryResponse[0]['score'] as int? ?? 0)
-            : 0;
-        print('Mood score: $moodScore');
-
-        final responses = await supabase
-            .from('questionnaire_responses')
-            .select('question_number, answer, score')
-            .eq('user_id', user.id)
-            .gte('question_number', 2)
-            .lte('question_number', 21);
-
-        if (responses.isEmpty) {
-          print('No questionnaire responses, using mood score only');
-          calculatedScore = moodScore;
-        } else {
-          int totalQuestionScore = 0;
-          for (var response in responses) {
-            final questionNumber = response['question_number'] as int;
-            final answer = response['answer'] as String;
-            final score = response['score'] as int? ?? _calculateQuestionScore(questionNumber, answer);
-            totalQuestionScore += score;
-          }
-          print('Total question score: $totalQuestionScore from ${responses.length} responses');
-          calculatedScore = ((moodScore + totalQuestionScore) / 2).round();
-          print('Initial calculated score: $calculatedScore');
-        }
-      } else {
-        print('Calculating score from activity moods');
-        // Fetch latest moods from all three sources
-        final journalMoodResponse = await supabase
-            .from('journal_entries')
-            .select('mood')
-            .eq('user_id', user.id)
-            .order('timestamp', ascending: false)
-            .limit(1);
-        final journalMood = journalMoodResponse.isNotEmpty
-            ? journalMoodResponse[0]['mood'] as String?
-            : null;
-        print('Latest journal mood: $journalMood');
-
-        final exerciseMoodResponse = await supabase
-            .from('exercise_entries')
-            .select('mood')
-            .eq('user_id', user.id)
-            .order('timestamp', ascending: false)
-            .limit(1);
-        final exerciseMood = exerciseMoodResponse.isNotEmpty
-            ? exerciseMoodResponse[0]['mood'] as String?
-            : null;
-        print('Latest exercise mood: $exerciseMood');
-
-        final photoMoodResponse = await supabase
-            .from('photo_entries')
-            .select('mood')
-            .eq('user_id', user.id)
-            .order('timestamp', ascending: false)
-            .limit(1);
-        final photoMood = photoMoodResponse.isNotEmpty
-            ? photoMoodResponse[0]['mood'] as String?
-            : null;
-        print('Latest photo mood: $photoMood');
-
-        int moodValue1 = _getMoodValue(journalMood);
-        int moodValue2 = _getMoodValue(exerciseMood);
-        int moodValue3 = _getMoodValue(photoMood);
-        print('Mood values - Journal: $moodValue1, Exercise: $moodValue2, Photo: $moodValue3');
-
-        double averageMood = (moodValue1 + moodValue2 + moodValue3) / 3.0;
-        calculatedScore = ((averageMood - 1) / 4 * 100).round();
-        print('Average mood: $averageMood, Activity-based score: $calculatedScore');
-      }
-
-      setState(() {
-        _currentScore = calculatedScore;
-        print('Updated _currentScore to: $_currentScore');
-      });
-    } catch (e) {
-      print('Error calculating current score: $e');
-      setState(() {
-        _currentScore = 0;
-      });
-    }
-  }
-  int _getMoodValue(String? mood) {
-    if (mood == null) return 3; // Default to Neutral if null
-    String normalizedMood = mood.trim().toLowerCase();
-    switch (normalizedMood) {
-      case 'sad': return 1;
-      case 'angry': return 2;
-      case 'neutral': return 3;
-      case 'happy': return 4;
-      case 'very happy': return 5;
-      case 'anxious, depressed': return 1; // From ScorePage
-      default:
-        print('Unknown mood: $mood, defaulting to 3');
-        return 3; // Default to Neutral
-    }
-  }
   String _getMoodFromScore(int score) {
     if (score >= 81) return 'Very Happy';
     else if (score >= 61) return 'Happy';
@@ -432,7 +245,7 @@ class _ScorePageState extends State<ScorePage> {
                         Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => GraphPage()));
                       },
                         style: ElevatedButton.styleFrom(
-                        elevation: 0.1,
+                          elevation: 0.1,
 
                           shape: RoundedRectangleBorder(
 
@@ -440,7 +253,7 @@ class _ScorePageState extends State<ScorePage> {
                           ),
                         ),
 
-                          child: Text('Check your Daily Data', style: TextStyle(color: Color(0xff9bb068),fontWeight: FontWeight.bold, fontSize: 16)),
+                        child: Text('Check your Daily Data', style: TextStyle(color: Color(0xff9bb068),fontWeight: FontWeight.bold, fontSize: 16)),
 
                       ),
                     ],

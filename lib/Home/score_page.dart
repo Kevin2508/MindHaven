@@ -201,27 +201,20 @@ class _ScorePageState extends State<ScorePage> {
                                 child: Icon(Icons.arrow_back, color: Colors.white),
                               ),
                             ),
-                            const Text(
-                              'NORMAL',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
+
                           ],
                         ),
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 5),
                       Text(
                         'Score',
                         style: TextStyle(
                           color: Colors.white.withOpacity(0.8),
-                          fontSize: 20,
+                          fontSize: 30,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 5),
                       Text(
                         _currentScore.toString(),
                         style: const TextStyle(
@@ -230,7 +223,7 @@ class _ScorePageState extends State<ScorePage> {
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 5),
                       Text(
                         _getScoreMessage(_currentScore),
                         style: TextStyle(
@@ -242,7 +235,7 @@ class _ScorePageState extends State<ScorePage> {
                       ),
                       const SizedBox(height: 10),
                       ElevatedButton(onPressed: (){
-                        Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => GraphPage()));
+                        Navigator.push(context, MaterialPageRoute(builder: (context) => GraphPage()));
                       },
                         style: ElevatedButton.styleFrom(
                           elevation: 0.1,
@@ -370,68 +363,7 @@ class _ScorePageState extends State<ScorePage> {
             ),
           ),
           const SizedBox(height: 30),
-          Align(
-            alignment: Alignment(0, 1),
-            child: Container(
-              height: 80,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(40),
-                  topRight: Radius.circular(40),
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.grey.withOpacity(0.2),
-                    spreadRadius: 2,
-                    blurRadius: 5,
-                    offset: const Offset(0, -3),
-                  ),
-                ],
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _buildFooterButton(
-                    icon: Icons.home,
-                    isActive: true,
-                    onPressed: () {
-                      // Navigate to Home page
-                      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => HomePage()));
-                    },
-                  ),
-                  _buildFooterButton(
-                    icon: Icons.message,
-                    isActive: false,
-                    onPressed: () {
-                      // Navigate to Community page
-                    },
-                  ),
-                  _buildFooterButton(
-                    icon: Icons.chat,
-                    isActive: false,
-                    onPressed: () {
-                      // Navigate to Chatbot page
-                    },
-                  ),
-                  _buildFooterButton(
-                    icon: Icons.bar_chart,
-                    isActive: false,
-                    onPressed: () {
-                      // Navigate to Dashboard page
-                    },
-                  ),
-                  _buildFooterButton(
-                    icon: Icons.person,
-                    isActive: false,
-                    onPressed: () {
-                      // Navigate to Profile page
-                    },
-                  ),
-                ],
-              ),
-            ),
-          ),
+
         ],
       ),
     );

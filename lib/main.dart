@@ -18,6 +18,10 @@ import 'package:mindhaven/assessment/gender.dart';
 import 'package:mindhaven/assessment/mood_page.dart'; // Updated to use MoodPage
 import 'package:mindhaven/assessment/enter_name_page.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
+import 'chat/chat_provider.dart';
+import 'package:mindhaven/chat/chat_screen.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Supabase.initialize(
@@ -28,7 +32,12 @@ void main() async {
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
-  runApp(const MyApp());
+  runApp(
+    ChangeNotifierProvider(
+      create: (_) => ChatProvider(),
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -67,6 +76,7 @@ class MyApp extends StatelessWidget {
         '/welcome': (context) => const WelcomePage(),
         '/EnterNamePage': (context) => const EnterNamePage(),
         '/profile': (context) => const ProfilePage(),
+        '/chat': (context) => const ChatScreen(),
         // Mapping question numbers to assessment pages
         '/mood': (context) => const MoodPage(),
         '/graph': (context) => const GraphPage(),
@@ -76,7 +86,7 @@ class MyApp extends StatelessWidget {
         '/music': (context) => ExercisePage(), // Create this page
         '/meditation': (context) => BreathingExercisePage(), // Create this page
         '/community': (context) => CommunityPage(), // Create this page
-         // Create this page
+        // Create this page
         '/dashboard': (context) => GraphPage(),// Question 1: Mood
         '/question2': (context) => const QuestionPage(
           questionNumber: 2,

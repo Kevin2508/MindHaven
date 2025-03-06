@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:mindhaven/assessment/mood_page.dart';
+
 class GenderPage extends StatefulWidget {
   const GenderPage({Key? key}) : super(key: key);
 
@@ -106,9 +107,9 @@ class _GenderPageState extends State<GenderPage> {
                   SizedBox(height: MediaQuery.of(context).size.height * 0.02),
                   Column(
                     children: [
-                      _buildGenderButton("I am Male", "assets/images/male_avatar.png"),
+                      _buildGenderButton("I am Male", "assets/images/male.png"),
                       SizedBox(height: MediaQuery.of(context).size.height * 0.02),
-                      _buildGenderButton("I am Female", "assets/images/female_avatar.png"),
+                      _buildGenderButton("I am Female", "assets/images/female.png"),
                       SizedBox(height: MediaQuery.of(context).size.height * 0.02),
                       ElevatedButton(
                         onPressed: navigateToNextScreen,
@@ -194,11 +195,18 @@ class _GenderPageState extends State<GenderPage> {
               ),
             ),
             Positioned(
-              bottom: MediaQuery.of(context).size.height * 0.03,
-              right: MediaQuery.of(context).size.width * 0.03,
-              child: CircleAvatar(
-                radius: 30,
-                backgroundImage: AssetImage(imagePath),
+              right: 25,
+              bottom: 12,
+              child: Container(
+                width: MediaQuery.of(context).size.width * 0.4,
+                height: MediaQuery.of(context).size.height * 0.17,
+                decoration: BoxDecoration(
+                  image: DecorationImage(
+                    image: AssetImage(imagePath),
+                    fit: BoxFit.contain,
+                    alignment: Alignment.bottomRight,
+                  ),
+                ),
               ),
             ),
           ],

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mindhaven/assessment/age.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class EnterNamePage extends StatefulWidget {
@@ -37,7 +38,7 @@ class _EnterNamePageState extends State<EnterNamePage> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Name stored successfully!')),
         );
-        Navigator.pushReplacementNamed(context, '/question1');
+        Navigator.pushReplacement(context, MaterialPageRoute(builder: (context)=>AgePage()));
       }
     } on PostgrestException catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:mindhaven/assessment/gender.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:math';
+import 'package:mindhaven/assessment/gender.dart';
 
 class AgePage extends StatefulWidget {
   const AgePage({Key? key}) : super(key: key);
@@ -47,7 +49,7 @@ class _AgePageState extends State<AgePage> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Age stored successfully!')),
       );
-      Navigator.pushReplacementNamed(context, '/profile_picture'); // Changed to navigate to ProfilePicturePage
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => GenderPage())); // Changed to navigate to ProfilePicturePage
     } on PostgrestException catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Postgrest Error: ${e.message} (Code: ${e.code}, Details: ${e.details})')),

@@ -24,80 +24,32 @@ class _HomePageState extends State<HomePage> {
   int notifications = 3;
   bool _isProfileComplete = false;
   int _currentScore = 0;
+  bool _isAssessmentDoneToday = false;
 
   Future<void> _calculateStreak() async {
-    final supabase = Supabase.instance.client;
-    final user = supabase.auth.currentUser;
-    if (user == null) return;
+    try {
+      final supabase = Supabase.instance.client;
+      final user = supabase.auth.currentUser;
+      if (user == null) return;
 
-    DateTime today = DateTime.now().toUtc();
-    DateTime startOfToday = DateTime(today.year, today.month, today.day);
-    int streak = 0;
+      // Fetch all unique dates from mental_score_history
+      final history = await supabase
+          .from('mental_score_history')
+          .select('date')
+          .eq('user_id', user.id);
 
-    final journalToday = await supabase
-        .from('journal_entries')
-        .select('id')
-        .eq('user_id', user.id)
-        .gte('timestamp', startOfToday.toIso8601String())
-        .lt('timestamp', startOfToday.add(Duration(days: 1)).toIso8601String());
+      // Count unique days with reassessments
+      final uniqueDays = (history as List).map((entry) => entry['date'] as String).toSet().length;
 
-    final exerciseToday = await supabase
-        .from('exercise_entries')
-        .select('id')
-        .eq('user_id', user.id)
-        .gte('timestamp', startOfToday.toIso8601String())
-        .lt('timestamp', startOfToday.add(Duration(days: 1)).toIso8601String());
-
-    final photoToday = await supabase
-        .from('photo_entries')
-        .select('id')
-        .eq('user_id', user.id)
-        .gte('timestamp', startOfToday.toIso8601String())
-        .lt('timestamp', startOfToday.add(Duration(days: 1)).toIso8601String());
-
-    if (journalToday.isNotEmpty && exerciseToday.isNotEmpty && photoToday.isNotEmpty) {
-      streak += 1;
-    } else {
       setState(() {
-        streakCount = streak;
+        streakCount = uniqueDays;
       });
-      return;
+    } catch (e) {
+      print('Error calculating streak: $e');
+      setState(() {
+        streakCount = 0;
+      });
     }
-
-    DateTime checkDay = startOfToday.subtract(Duration(days: 1));
-    while (true) {
-      final journalCheck = await supabase
-          .from('journal_entries')
-          .select('id')
-          .eq('user_id', user.id)
-          .gte('timestamp', checkDay.toIso8601String())
-          .lt('timestamp', checkDay.add(Duration(days: 1)).toIso8601String());
-
-      final exerciseCheck = await supabase
-          .from('exercise_entries')
-          .select('id')
-          .eq('user_id', user.id)
-          .gte('timestamp', checkDay.toIso8601String())
-          .lt('timestamp', checkDay.add(Duration(days: 1)).toIso8601String());
-
-      final photoCheck = await supabase
-          .from('photo_entries')
-          .select('id')
-          .eq('user_id', user.id)
-          .gte('timestamp', checkDay.toIso8601String())
-          .lt('timestamp', checkDay.add(Duration(days: 1)).toIso8601String());
-
-      if (journalCheck.isNotEmpty && exerciseCheck.isNotEmpty && photoCheck.isNotEmpty) {
-        streak += 1;
-        checkDay = checkDay.subtract(Duration(days: 1));
-      } else {
-        break;
-      }
-    }
-
-    setState(() {
-      streakCount = streak;
-    });
   }
 
   @override
@@ -146,6 +98,53 @@ class _HomePageState extends State<HomePage> {
             'https://via.placeholder.com/64';
         _isProfileComplete = isAssessmentComplete;
       });
+    }
+  }
+
+  Future<void> _checkHowYouFeelToday() async {
+    try {
+      final supabase = Supabase.instance.client;
+      final user = supabase.auth.currentUser;
+      if (user == null) return;
+
+      // Get today's date in "DD MMM" format
+      final today = DateFormat('dd MMM').format(DateTime.now()).toUpperCase();
+
+      // Check if entry exists for today
+      final todayEntry = await supabase
+          .from('mental_score_history')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('date', today)
+          .maybeSingle();
+
+      setState(() {
+        _isAssessmentDoneToday = todayEntry != null;
+      });
+
+      if (_isAssessmentDoneToday) {
+        // Entry already exists, just refresh streak and score
+        await _calculateStreak();
+        await _calculateCurrentScore();
+        return;
+      }
+
+      // Navigate to MoodPage if no entry for today
+      final result = await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => MoodPage()),
+      );
+
+      // If MoodPage completes, refresh streak and score
+      if (result == true) {
+        await _calculateStreak();
+        await _calculateCurrentScore();
+        setState(() {
+          _isAssessmentDoneToday = true; // Update flag after completion
+        });
+      }
+    } catch (e) {
+      print('Error in How You Feel Today: $e');
     }
   }
 
@@ -334,6 +333,7 @@ class _HomePageState extends State<HomePage> {
                             ),
                           ),
                           SizedBox(height: MediaQuery.of(context).size.height * 0.03),
+                          if (!_isAssessmentDoneToday)
                           Align(
                             alignment: Alignment.center,
                             child: Padding(
@@ -342,10 +342,7 @@ class _HomePageState extends State<HomePage> {
                               ),
                               child: ElevatedButton(
                                 onPressed: () {
-                                  Navigator.pushReplacement(
-                                      context,
-                                      MaterialPageRoute(
-                                          builder: (context) => MoodPage()));
+                                  _checkHowYouFeelToday(); // Updated method name
                                 },
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: const Color(0xFF9BB068),
@@ -354,7 +351,7 @@ class _HomePageState extends State<HomePage> {
                                   ),
                                 ),
                                 child: Text(
-                                  'Reassessment',
+                                  'How You Feel Today', // Renamed from "Reassessment"
                                   style: TextStyle(
                                     color: Colors.white,
                                     fontSize: orientation == Orientation.portrait ? 16 : 12,
@@ -422,6 +419,65 @@ class _HomePageState extends State<HomePage> {
                               ],
                             ),
                           ),
+                          const SizedBox(height: 20),
+                          Padding(
+                            padding: EdgeInsets.only(
+                              left: MediaQuery.of(context).size.width * 0.03,
+                            ),
+                            child: Text(
+                              'AI Therapy Chatbot',
+                              style: TextStyle(
+                                fontSize: orientation == Orientation.portrait ? 20 : 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.only(top:10, left: 10.0, right: 10.0),
+                            child: ElevatedButton(
+                              onPressed: (){},
+
+                              style: ElevatedButton.styleFrom(
+                                
+                                backgroundColor: Color(0xff926247),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                
+                              ),
+                              child: Container(
+                                width: double.infinity,
+                                height: 180,
+
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(20),
+                                  color: Color(0xff926247),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Text('2541', style: TextStyle(
+                                          fontSize: 54,
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold
+                                        ),),
+                                        Text('Conversations', style: TextStyle(
+                                          fontSize: 18,
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold
+                                        ),),
+                                      ],
+                                    ),
+                                    SizedBox(width: 24),
+                                    Image.asset('assets/images/reading.png',height: 140,width: 140,)
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
                           SizedBox(height: MediaQuery.of(context).size.height * 0.03),
                           Padding(
                             padding: EdgeInsets.only(
@@ -435,6 +491,7 @@ class _HomePageState extends State<HomePage> {
                               ),
                             ),
                           ),
+
                           Align(
                             alignment: Alignment.center,
                             child: Padding(
@@ -472,16 +529,7 @@ class _HomePageState extends State<HomePage> {
                                       );
                                     },
                                   ),
-                                  _buildTrackerButton(
-                                    icon: Icons.psychology,
-                                    title: 'Stress Level',
-                                    value: 'Level 3 (Normal)',
-                                    color: Colors.yellow,
-                                    orientation: orientation,
-                                    onPressed: () {
-                                      Navigator.pushNamed(context, '/stress');
-                                    },
-                                  ),
+
                                   _buildTrackerButton(
                                     icon: Icons.mood,
                                     title: 'Mood Tracker',

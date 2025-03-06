@@ -12,13 +12,17 @@ import 'package:mindhaven/assessment/age.dart';
 import 'package:mindhaven/assessment/gender.dart';
 import 'package:mindhaven/assessment/mood_page.dart'; // Updated to use MoodPage
 import 'package:mindhaven/assessment/enter_name_page.dart';
-
+import 'package:flutter/services.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Supabase.initialize(
     url: 'https://ivrpyicshglignfqpzhs.supabase.co',
     anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2cnB5aWNzaGdsaWduZnFwemhzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDA4MzQ4MDcsImV4cCI6MjA1NjQxMDgwN30.gocb_iC5tLI5LxFAJ49Ij7NDftIvth4aYxxaupHO8c8',
   );
+  await SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]);
   runApp(const MyApp());
 }
 

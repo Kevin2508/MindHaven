@@ -48,6 +48,7 @@ class _SignUpPageState extends State<SignUpPage> {
                       height: MediaQuery.of(context).size.height * 0.4,
                       width: double.infinity,
                       color: const Color(0xff9BB168),
+                      child: Image.asset('assets/images/write.png'),
                     ),
                   ),
                   SizedBox(height: MediaQuery.of(context).size.height * 0.03),

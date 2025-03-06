@@ -139,6 +139,7 @@ class _LoginPageState extends State<LoginPage> {
                       height: MediaQuery.of(context).size.height * 0.4,
                       width: double.infinity,
                       color: const Color(0xff9BB168),
+                      child: Image.asset('assets/images/write.png',height: 40,width: 40,),
                     ),
                   ),
                   SizedBox(height: MediaQuery.of(context).size.height * 0.03),
@@ -205,7 +206,7 @@ class _LoginPageState extends State<LoginPage> {
                             style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
                           ),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blue,
+                            backgroundColor: Color(0xff9BB168),
                             minimumSize: Size(double.infinity, MediaQuery.of(context).size.height * 0.07),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(32)),
                           ),

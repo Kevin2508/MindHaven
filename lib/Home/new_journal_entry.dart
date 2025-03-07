@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:mindhaven/Home/daily_journal.dart';
+import 'package:mindhaven/Home/daily_journal.dart'; // Replace with your actual import
 
 class NewJournalEntryPage extends StatefulWidget {
   final bool isEditing;
@@ -19,13 +19,16 @@ class NewJournalEntryPage extends StatefulWidget {
 class _NewJournalEntryPageState extends State<NewJournalEntryPage> {
   final _titleController = TextEditingController();
   final _entryController = TextEditingController();
+  final _titleFocusNode = FocusNode();
+  final _entryFocusNode = FocusNode();
+  final _scrollController = ScrollController();
   String _selectedEmotion = 'Neutral';
   final List<Map<String, dynamic>> _emotions = [
-    {'name': 'Sad', 'emoji': '😢', 'color': Colors.blue},
-    {'name': 'Angry', 'emoji': '😡', 'color': Colors.orange},
+    {'name': 'Sad', 'emoji': '😢', 'color': Colors.blueAccent},
+    {'name': 'Angry', 'emoji': '😡', 'color': Colors.orangeAccent},
     {'name': 'Neutral', 'emoji': '😐', 'color': Colors.grey},
-    {'name': 'Happy', 'emoji': '🙂', 'color': Colors.yellow},
-    {'name': 'Very Happy', 'emoji': '😄', 'color': Colors.green},
+    {'name': 'Happy', 'emoji': '🙂', 'color': Colors.yellowAccent},
+    {'name': 'Very Happy', 'emoji': '😄', 'color': Colors.greenAccent},
   ];
 
   @override
@@ -42,6 +45,9 @@ class _NewJournalEntryPageState extends State<NewJournalEntryPage> {
   void dispose() {
     _titleController.dispose();
     _entryController.dispose();
+    _titleFocusNode.dispose();
+    _entryFocusNode.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -51,7 +57,6 @@ class _NewJournalEntryPageState extends State<NewJournalEntryPage> {
       final user = supabase.auth.currentUser;
       if (user != null && _titleController.text.isNotEmpty && _entryController.text.isNotEmpty) {
         if (widget.isEditing && widget.journalData != null) {
-          // Update existing entry
           await supabase
               .from('journal_entries')
               .update({
@@ -62,7 +67,6 @@ class _NewJournalEntryPageState extends State<NewJournalEntryPage> {
           })
               .eq('id', widget.journalData!['id']);
         } else {
-          // Create new entry
           await supabase.from('journal_entries').insert({
             'user_id': user.id,
             'mood': _selectedEmotion,
@@ -73,20 +77,28 @@ class _NewJournalEntryPageState extends State<NewJournalEntryPage> {
         }
 
         if (mounted) {
-          Navigator.push(
+          Navigator.pushReplacement(
             context,
             MaterialPageRoute(builder: (context) => const JournalPage()),
           );
         }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please fill all fields')),
+          SnackBar(
+            content: Text('Please fill all fields'),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error saving journal: $e')),
+          SnackBar(
+            content: Text('Error saving journal: $e'),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
     }
@@ -95,121 +107,219 @@ class _NewJournalEntryPageState extends State<NewJournalEntryPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xfff4eee0),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.arrow_back),
-                      onPressed: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => const JournalPage()),
+      resizeToAvoidBottomInset: true,
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color(0xfff4eee0),
+              Color(0xffe0d8c8),
+            ],
+          ),
+        ),
+        child: SafeArea(
+          child: SingleChildScrollView(
+            controller: _scrollController,
+            child: Padding(
+              padding: EdgeInsets.all(24.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Header
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      IconButton(
+                        icon: Icon(Icons.arrow_back_ios_rounded, color: Color(0xff5e3e2b), size: 28),
+                        onPressed: () => Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(builder: (context) => const JournalPage()),
+                        ),
+                        splashRadius: 24,
+                        tooltip: 'Back to Journal',
                       ),
-                    ),
-                    Text(
-                      widget.isEditing ? 'Edit Journal Entry' : 'New Journal Entry',
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(width: 48),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Journal Title',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: _titleController,
-                  decoration: InputDecoration(
-                    hintText: 'Enter title here',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    filled: true,
-                    fillColor: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Select Your Emotion',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: _emotions.map((emotion) {
-                    return GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _selectedEmotion = emotion['name'] as String;
-                        });
-                      },
-                      child: CircleAvatar(
-                        radius: 25,
-                        backgroundColor: _selectedEmotion == emotion['name']
-                            ? emotion['color'].withOpacity(0.2)
-                            : Colors.transparent,
-                        child: Text(
-                          emotion['emoji'] as String,
-                          style: const TextStyle(fontSize: 30),
+                      Text(
+                        widget.isEditing ? 'Edit Journal Entry' : 'New Journal Entry',
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xff5e3e2b),
+                          shadows: [
+                            Shadow(
+                              color: Colors.black26,
+                              blurRadius: 4,
+                              offset: Offset(2, 2),
+                            ),
+                          ],
                         ),
                       ),
-                    );
-                  }).toList(),
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Write Your Entry',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.black, width: 2),
+                      SizedBox(width: 48),
+                    ],
                   ),
-                  child: TextField(
-                    controller: _entryController,
-                    maxLines: 5,
-                    decoration: const InputDecoration(
-                      hintText: 'Write your thoughts here...',
-                      border: InputBorder.none,
+                  SizedBox(height: 30),
+                  // Title Input
+                  Text(
+                    'Journal Title',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xff5e3e2b),
                     ),
                   ),
-                ),
-                const SizedBox(height: 32),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: _saveJournal,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.black,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+                  SizedBox(height: 12),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black12,
+                          blurRadius: 6,
+                          offset: Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: TextField(
+                      controller: _titleController,
+                      focusNode: _titleFocusNode,
+                      decoration: InputDecoration(
+                        hintText: 'Enter title here',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        fillColor: Colors.white,
+                        filled: true,
+                      ),
+                      onTap: () {
+                        _titleFocusNode.requestFocus();
+                        _scrollController.animateTo(
+                          0,
+                          duration: Duration(milliseconds: 300),
+                          curve: Curves.easeInOut,
+                        );
+                      },
+                    ),
+                  ),
+                  SizedBox(height: 24),
+                  // Emotion Selection
+                  Text(
+                    'How Are You Feeling?',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xff5e3e2b),
+                    ),
+                  ),
+                  SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: _emotions.map((emotion) {
+                      final isSelected = _selectedEmotion == emotion['name'];
+                      return GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _selectedEmotion = emotion['name'] as String;
+                          });
+                        },
+                        child: Container(
+                          padding: EdgeInsets.all(isSelected ? 12 : 8),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: isSelected
+                                ? (emotion['color'] as Color).withOpacity(0.2)
+                                : Colors.transparent,
+                            boxShadow: isSelected
+                                ? [
+                              BoxShadow(
+                                color: (emotion['color'] as Color).withOpacity(0.4),
+                                blurRadius: 8,
+                                offset: Offset(0, 4),
+                              ),
+                            ]
+                                : [],
+                          ),
+                          child: Text(
+                            emotion['emoji'] as String,
+                            style: TextStyle(fontSize: isSelected ? 36 : 30),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  SizedBox(height: 24),
+                  // Entry Input
+                  Text(
+                    'Your Thoughts',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xff5e3e2b),
+                    ),
+                  ),
+                  SizedBox(height: 12),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black12,
+                          blurRadius: 6,
+                          offset: Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: TextField(
+                      controller: _entryController,
+                      focusNode: _entryFocusNode,
+                      maxLines: 8,
+                      decoration: InputDecoration(
+                        hintText: 'Write your thoughts here...',
+                        border: InputBorder.none,
+                        contentPadding: EdgeInsets.all(16),
+                      ),
+                      onTap: () {
+                        _entryFocusNode.requestFocus();
+                        _scrollController.animateTo(
+                          _scrollController.position.maxScrollExtent,
+                          duration: Duration(milliseconds: 300),
+                          curve: Curves.easeInOut,
+                        );
+                      },
+                    ),
+                  ),
+                  SizedBox(height: 40),
+                  // Save Button
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: _saveJournal,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Color(0xff5e3e2b),
+                        padding: EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 8,
+                        shadowColor: Colors.black38,
+                      ),
+                      child: Text(
+                        widget.isEditing ? 'Update Journal' : 'Save Journal',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
-                    child: Text(
-                      widget.isEditing ? 'Update Journal' : 'Create Journal',
-                      style: const TextStyle(color: Colors.white, fontSize: 16),
-                    ),
                   ),
-                ),
-                const SizedBox(height: 16),
-              ],
+                  SizedBox(height: 20),
+                ],
+              ),
             ),
           ),
         ),

@@ -3,9 +3,10 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'dart:io';
+import 'package:flutter_animate/flutter_animate.dart';
 
 class CommunityPage extends StatefulWidget {
-  final String? theme; // Add parameter to filter posts by hashtag/theme
+  final String? theme;
 
   const CommunityPage({super.key, this.theme});
 
@@ -20,14 +21,14 @@ class _CommunityPageState extends State<CommunityPage> {
   String _caption = '';
   final _captionController = TextEditingController();
   List<Map<String, dynamic>> _posts = [];
-  bool _isLoading = true; // Add loading state
-  List<String> _uniqueHashtags = []; // Store unique hashtags
+  bool _isLoading = true;
+  List<String> _uniqueHashtags = [];
 
   @override
   void initState() {
     super.initState();
     _loadUserData();
-    _fetchPosts(); // Fetch posts on initialization
+    _fetchPosts();
   }
 
   Future<void> _pickImage() async {
@@ -39,29 +40,57 @@ class _CommunityPageState extends State<CommunityPage> {
         context: context,
         builder: (BuildContext context) {
           return AlertDialog(
-            title: const Text('Create Post'),
-            content: SingleChildScrollView( // Make the content scrollable
+            backgroundColor: Color(0xfff4eee0),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Text(
+              'Create Post',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Color(0xff5e3e2b),
+              ),
+            ),
+            content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Image.file(
-                    File(image.path),
-                    height: 200,
-                    fit: BoxFit.cover,
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: _captionController,
-                    decoration: const InputDecoration(
-                      hintText: 'Write a caption...',
-                      border: OutlineInputBorder(),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.file(
+                      File(image.path),
+                      height: 200,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
                     ),
-                    maxLines: 3,
-                    onChanged: (value) {
-                      setState(() {
-                        _caption = value;
-                      });
-                    },
+                  ),
+                  SizedBox(height: 16),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black12,
+                          blurRadius: 6,
+                          offset: Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: TextField(
+                      controller: _captionController,
+                      decoration: InputDecoration(
+                        hintText: 'Write a caption...',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                        contentPadding: EdgeInsets.all(16),
+                        fillColor: Colors.white,
+                        filled: true,
+                      ),
+                      maxLines: 3,
+                      onChanged: (value) => _caption = value,
+                    ),
                   ),
                 ],
               ),
@@ -69,16 +98,20 @@ class _CommunityPageState extends State<CommunityPage> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel'),
+                child: Text('Cancel', style: TextStyle(color: Color(0xff5e3e2b))),
               ),
-              TextButton(
+              ElevatedButton(
                 onPressed: () {
                   setState(() {
                     _selectedImage = File(image.path);
                   });
                   _uploadPost();
                 },
-                child: const Text('Post'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Color(0xff5e3e2b),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                child: Text('Post', style: TextStyle(color: Colors.white)),
               ),
             ],
           );
@@ -102,20 +135,14 @@ class _CommunityPageState extends State<CommunityPage> {
       });
 
       setState(() {
-        userName = response?['full_name']?.split(' ')?.first ??
-            user.email?.split('@')[0] ??
-            'User';
-        profileImageUrl = response?['avatar_url'] ??
-            'https://via.placeholder.com/64'; // Default image
+        userName = response?['full_name']?.split(' ')?.first ?? user.email?.split('@')[0] ?? 'User';
+        profileImageUrl = response?['avatar_url'] ?? 'https://via.placeholder.com/64';
       });
     }
   }
 
   Future _fetchPosts() async {
-    debugPrint('Attempting to fetch posts...');
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
     try {
       final supabase = Supabase.instance.client;
       final user = supabase.auth.currentUser;
@@ -160,18 +187,12 @@ class _CommunityPageState extends State<CommunityPage> {
       setState(() {
         _posts = postsWithVotes;
         _uniqueHashtags = uniqueHashtags.toList();
-      });
-      debugPrint('Fetched posts: $_posts');
-      debugPrint('Detected hashtags: $_uniqueHashtags');
-    } catch (e) {
-      print('Error fetching posts: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error fetching posts: $e')),
-      );
-    } finally {
-      setState(() {
         _isLoading = false;
       });
+    } catch (e) {
+      print('Error fetching posts: $e');
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error fetching posts: $e')));
+      setState(() => _isLoading = false);
     }
   }
 
@@ -180,7 +201,7 @@ class _CommunityPageState extends State<CommunityPage> {
     RegExp regExp = RegExp(r'#\w+');
     Iterable<Match> matches = regExp.allMatches(caption);
     for (Match match in matches) {
-      hashtags.add(match.group(0)!); // Add the full hashtag (e.g., "#job")
+      hashtags.add(match.group(0)!);
     }
     return hashtags;
   }
@@ -188,14 +209,9 @@ class _CommunityPageState extends State<CommunityPage> {
   Future<String?> _getUserName(String userId) async {
     try {
       final supabase = Supabase.instance.client;
-      final response = await supabase
-          .from('profiles')
-          .select('full_name')
-          .eq('id', userId)
-          .single();
+      final response = await supabase.from('profiles').select('full_name').eq('id', userId).single();
       return response['full_name'] ?? 'Anonymous';
     } catch (e) {
-      print('Error fetching user name: $e');
       return 'Anonymous';
     }
   }
@@ -203,23 +219,16 @@ class _CommunityPageState extends State<CommunityPage> {
   Future<String?> _getUserProfileImage(String userId) async {
     try {
       final supabase = Supabase.instance.client;
-      final response = await supabase
-          .from('profiles')
-          .select('avatar_url')
-          .eq('id', userId)
-          .single();
+      final response = await supabase.from('profiles').select('avatar_url').eq('id', userId).single();
       return response['avatar_url'] ?? 'https://via.placeholder.com/64';
     } catch (e) {
-      print('Error fetching user profile image: $e');
       return 'https://via.placeholder.com/64';
     }
   }
 
   Future<void> _uploadPost() async {
     if (_selectedImage == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select an image')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select an image')));
       return;
     }
 
@@ -227,29 +236,20 @@ class _CommunityPageState extends State<CommunityPage> {
       final supabase = Supabase.instance.client;
       final user = supabase.auth.currentUser;
       if (user == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please log in to post')),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please log in to post')));
         return;
       }
 
-      // Upload image to storage
       final fileName = '${DateTime.now().toIso8601String()}_${user.id}.jpg';
       final bytes = await _selectedImage!.readAsBytes();
       await supabase.storage.from('community_images').uploadBinary(
         fileName,
         bytes,
-        fileOptions: const FileOptions(
-          contentType: 'image/jpeg',
-        ),
+        fileOptions: const FileOptions(contentType: 'image/jpeg'),
       );
 
-      // Get the public URL of the uploaded image
-      final imageUrl = supabase.storage
-          .from('community_images')
-          .getPublicUrl(fileName);
+      final imageUrl = supabase.storage.from('community_images').getPublicUrl(fileName);
 
-      // Create post in the database
       await supabase.from('community_posts').insert({
         'user_id': user.id,
         'image_url': imageUrl,
@@ -258,27 +258,18 @@ class _CommunityPageState extends State<CommunityPage> {
         'downvotes': 0,
       });
 
-      // Clear the form and refresh posts
       setState(() {
         _selectedImage = null;
         _caption = '';
         _captionController.clear();
       });
 
-      // Close the dialog
       Navigator.pop(context);
-
-      // Refresh posts
       await _fetchPosts();
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Post uploaded successfully!')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Post uploaded successfully!')));
     } catch (e) {
       print('Error uploading post: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error uploading post: $e')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error uploading post: $e')));
     }
   }
 
@@ -287,19 +278,12 @@ class _CommunityPageState extends State<CommunityPage> {
       final supabase = Supabase.instance.client;
       final user = supabase.auth.currentUser;
       if (user == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please log in to vote.')),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please log in to vote.')));
         return;
       }
 
-      final postIdNum = int.tryParse(postId) ?? 0; // Safely convert postId to int
-      if (postIdNum == 0) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Invalid post ID.')),
-        );
-        return;
-      }
+      final postIdNum = int.tryParse(postId) ?? 0;
+      if (postIdNum == 0) return;
 
       final existingVote = await supabase
           .from('user_votes')
@@ -308,27 +292,16 @@ class _CommunityPageState extends State<CommunityPage> {
           .eq('post_id', postIdNum)
           .single()
           .then((value) => value as Map<String, dynamic>?)
-          .catchError((e) {
-        print('Error checking existing vote: $e');
-        return null;
-      });
+          .catchError((e) => null);
 
       final postResponse = await supabase
           .from('community_posts')
           .select('upvotes, downvotes')
           .eq('id', postIdNum)
           .single()
-          .catchError((e) {
-        print('Error fetching post data: $e');
-        return null;
-      }) as Map<String, dynamic>?;
+          .catchError((e) => null) as Map<String, dynamic>?;
 
-      if (postResponse == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Post not found.')),
-        );
-        return;
-      }
+      if (postResponse == null) return;
 
       int currentUpvotes = postResponse['upvotes'] as int? ?? 0;
       int currentDownvotes = postResponse['downvotes'] as int? ?? 0;
@@ -351,19 +324,11 @@ class _CommunityPageState extends State<CommunityPage> {
       } else {
         if (isUpvote) {
           currentUpvotes += 1;
-          await supabase.from('user_votes').insert({
-            'user_id': user.id,
-            'post_id': postIdNum,
-            'vote_type': 'upvote',
-          });
+          await supabase.from('user_votes').insert({'user_id': user.id, 'post_id': postIdNum, 'vote_type': 'upvote'});
           await supabase.from('community_posts').update({'upvotes': currentUpvotes}).eq('id', postIdNum);
         } else {
           currentDownvotes += 1;
-          await supabase.from('user_votes').insert({
-            'user_id': user.id,
-            'post_id': postIdNum,
-            'vote_type': 'downvote',
-          });
+          await supabase.from('user_votes').insert({'user_id': user.id, 'post_id': postIdNum, 'vote_type': 'downvote'});
           await supabase.from('community_posts').update({'downvotes': currentDownvotes}).eq('id', postIdNum);
         }
       }
@@ -371,34 +336,31 @@ class _CommunityPageState extends State<CommunityPage> {
       await _fetchPosts();
     } catch (e) {
       print('Error voting: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error voting: $e')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error voting: $e')));
     }
   }
 
   void _showPostOptions(BuildContext context, Map<String, dynamic> post) {
-    print('Showing options for post: ${post['id']}');
     showModalBottomSheet(
       context: context,
+      backgroundColor: Color(0xfff4eee0),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
       builder: (BuildContext sheetContext) {
         return Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.edit),
-              title: const Text('Update'),
+              leading: Icon(Icons.edit, color: Color(0xff5e3e2b)),
+              title: Text('Update', style: TextStyle(color: Color(0xff5e3e2b))),
               onTap: () {
-                print('Update tapped for post: ${post['id']}');
-                Navigator.pop(sheetContext); // Close bottom sheet
-                _showUpdateCaptionDialog(context, post); // Use original context
+                Navigator.pop(sheetContext);
+                _showUpdateCaptionDialog(context, post);
               },
             ),
             ListTile(
-              leading: const Icon(Icons.delete),
-              title: const Text('Delete'),
+              leading: Icon(Icons.delete, color: Colors.redAccent),
+              title: Text('Delete', style: TextStyle(color: Color(0xff5e3e2b))),
               onTap: () {
-                print('Delete tapped for post: ${post['id']}');
                 Navigator.pop(sheetContext);
                 _deletePost(post);
               },
@@ -410,86 +372,99 @@ class _CommunityPageState extends State<CommunityPage> {
   }
 
   void _showUpdateCaptionDialog(BuildContext context, Map<String, dynamic> post) {
-    print('Attempting to show update dialog for post: ${post['id']}');
     final TextEditingController captionController = TextEditingController(text: post['caption'] ?? '');
     showDialog(
       context: context,
       builder: (BuildContext dialogContext) {
-        print('Dialog builder called');
         return AlertDialog(
-          title: const Text('Update Caption'),
+          backgroundColor: Color(0xfff4eee0),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text(
+            'Update Caption',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xff5e3e2b)),
+          ),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Image.network(
-                  post['image_url'],
-                  height: 200,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) {
-                    print('Image load error: $error');
-                    return Container(
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.network(
+                    post['image_url'],
+                    height: 200,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => Container(
                       height: 200,
+                      width: double.infinity,
                       color: Colors.grey[300],
-                      child: const Center(child: Text('Image not available')),
-                    );
-                  },
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: captionController,
-                  decoration: const InputDecoration(
-                    hintText: 'Enter new caption...',
-                    border: OutlineInputBorder(),
+                      child: Center(child: Text('Image not available')),
+                    ),
                   ),
-                  maxLines: 3,
+                ),
+                SizedBox(height: 16),
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black12,
+                        blurRadius: 6,
+                        offset: Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: TextField(
+                    controller: captionController,
+                    decoration: InputDecoration(
+                      hintText: 'Enter new caption...',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding: EdgeInsets.all(16),
+                      fillColor: Colors.white,
+                      filled: true,
+                    ),
+                    maxLines: 3,
+                  ),
                 ),
               ],
             ),
           ),
           actions: [
             TextButton(
-              onPressed: () {
-                print('Cancel pressed');
-                Navigator.pop(dialogContext);
-              },
-              child: const Text('Cancel'),
+              onPressed: () => Navigator.pop(dialogContext),
+              child: Text('Cancel', style: TextStyle(color: Color(0xff5e3e2b))),
             ),
-            TextButton(
+            ElevatedButton(
               onPressed: () async {
-                print('Update pressed with caption: ${captionController.text}');
                 if (captionController.text.trim().isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Caption cannot be empty')),
-                  );
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Caption cannot be empty')));
                   return;
                 }
                 try {
                   final supabase = Supabase.instance.client;
-                  await supabase.from('community_posts').update({
-                    'caption': captionController.text.trim(),
-                  }).eq('id', post['id']);
-                  Navigator.pop(dialogContext); // Close dialog
-                  await _fetchPosts(); // Refresh posts
-                  setState(() {}); // Ensure UI updates
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Caption updated successfully!')),
-                  );
+                  await supabase.from('community_posts').update({'caption': captionController.text.trim()}).eq('id', post['id']);
+                  Navigator.pop(dialogContext);
+                  await _fetchPosts();
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Caption updated successfully!')));
                 } catch (e) {
                   print('Error updating caption: $e');
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Error updating caption: $e')),
-                  );
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error updating caption: $e')));
                 }
               },
-              child: const Text('Update'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Color(0xff5e3e2b),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              child: Text('Update', style: TextStyle(color: Colors.white)),
             ),
           ],
         );
       },
-    ).catchError((e) {
-      print('Error showing dialog: $e');
-    });
+    );
   }
 
   Future<void> _deletePost(Map<String, dynamic> post) async {
@@ -503,301 +478,245 @@ class _CommunityPageState extends State<CommunityPage> {
       await supabase.from('community_posts').delete().eq('id', post['id']);
       await supabase.from('user_votes').delete().eq('post_id', post['id']);
       await _fetchPosts();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Post deleted successfully!')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Post deleted successfully!')));
     } catch (e) {
       print('Error deleting post: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error deleting post: $e')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error deleting post: $e')));
     }
   }
 
   @override
   Widget build(BuildContext context) {
     List<Map<String, dynamic>> displayedPosts = widget.theme != null
-        ? _posts.where((post) {
-      final hashtags = post['hashtags'] as List<String>? ?? [];
-      return hashtags.any((hashtag) => hashtag.toLowerCase() == '#${widget.theme!.toLowerCase()}');
-    }).toList()
+        ? _posts.where((post) => (post['hashtags'] as List<String>? ?? []).any((hashtag) => hashtag.toLowerCase() == '#${widget.theme!.toLowerCase()}')).toList()
         : _posts;
 
     return Scaffold(
-      body: SafeArea(
-        child: Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(16.0),
-              decoration: const BoxDecoration(
-                color: Color(0xff9bb068),
-                borderRadius: BorderRadius.only(
-                  bottomLeft: Radius.circular(20),
-                  bottomRight: Radius.circular(20),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xfff4eee0), Color(0xffe0d8c8)],
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
+            children: [
+              // Header with Back Button
+              Container(
+                padding: EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Color(0xff926247),
+                  boxShadow: [
+                    BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 4)),
+                  ],
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    IconButton(
+                      icon: Icon(Icons.arrow_back_ios_rounded, color: Colors.white, size: 28),
+                      onPressed: () => Navigator.pop(context),
+                      splashRadius: 24,
+                      tooltip: 'Back',
+                    ),
+                    Text(
+                      'Community',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        shadows: [Shadow(color: Colors.black38, blurRadius: 4, offset: Offset(2, 2))],
+                      ),
+                    ),
+                    IconButton(
+                      icon: CircleAvatar(
+                        radius: 18,
+                        backgroundColor: Colors.white,
+                        child: Icon(Icons.add, color: Color(0xff5e3e2b), size: 24),
+                      ),
+                      onPressed: _pickImage,
+                      tooltip: 'New Post',
+                    ),
+                  ],
                 ),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 20,
-                        backgroundImage: NetworkImage(profileImageUrl!),
-                      ),
-                      const SizedBox(width: 10),
-                      Text(
-                        userName ?? 'User',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                  IconButton(
-                    icon: const CircleAvatar(
-                      radius: 15,
-                      backgroundColor: Colors.white,
-                      child: Icon(Icons.add, color: Color(0xff9bb068)),
-                    ),
-                    onPressed: _pickImage,
-                  ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: const Text(
-                      'Themed Discussion',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  if (_uniqueHashtags.isNotEmpty)
-                    Wrap(
-                      spacing: 8.0,
-                      runSpacing: 8.0,
-                      children: _uniqueHashtags.asMap().entries.map((entry) {
-                        int index = entry.key;
-                        String hashtag = entry.value;
-                        String buttonText = hashtag.replaceAll('#', '').toUpperCase();
-
-                        Color buttonColor;
-                        switch (index % 3) {
-                          case 0:
-                            buttonColor = Color(0xff9bb068);
-                            break;
-                          case 1:
-                            buttonColor = Color(0xff6b9b68);
-                            break;
-                          case 2:
-                            buttonColor = Color(0xff689b9b);
-                            break;
-                          default:
-                            buttonColor = Colors.grey;
-                        }
-
-                        return ElevatedButton(
-                          onPressed: () {
-                            final currentTheme = widget.theme;
-                            if (currentTheme == buttonText) {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => const CommunityPage(),
-                                ),
-                              );
-                            } else {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => CommunityPage(theme: buttonText),
-                                ),
-                              );
-                            }
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: buttonColor,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          ),
-                          child: Text(
-                            buttonText,
-                            style: const TextStyle(color: Colors.white, fontSize: 14),
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: _isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : SingleChildScrollView(
+              // Hashtags
+              Container(
+                padding: EdgeInsets.all(16),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (displayedPosts.isEmpty)
-                      const Padding(
-                        padding: EdgeInsets.all(16.0),
-                        child: Text('No posts yet for this theme. Be the first to share!'),
-                      )
-                    else
-                      ListView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: displayedPosts.length,
-                        itemBuilder: (context, index) {
-                          final post = displayedPosts[index];
-                          bool isUpvoted = post['userVote'] == 'upvote';
-                          bool isDownvoted = post['userVote'] == 'downvote';
-                          final currentUser = Supabase.instance.client.auth.currentUser;
-                          final isCurrentUserPost = currentUser != null && post['user_id'] == currentUser.id;
+                    Text(
+                      'Themed Discussion',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xff5e3e2b)),
+                    ),
+                    SizedBox(height: 12),
+                    if (_uniqueHashtags.isNotEmpty)
+                      Wrap(
+                        spacing: 8.0,
+                        runSpacing: 8.0,
+                        children: _uniqueHashtags.asMap().entries.map((entry) {
+                          int index = entry.key;
+                          String hashtag = entry.value;
+                          String buttonText = hashtag.replaceAll('#', '').toUpperCase();
+                          Color buttonColor = [Color(0xff9bb068), Color(0xff6b9b68), Color(0xff689b9b)][index % 3];
 
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 8.0),
-                            child: Card(
-                              elevation: 2,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  ListTile(
-                                    leading: FutureBuilder<String?>(
-                                      future: _getUserProfileImage(post['user_id']),
-                                      builder: (context, snapshot) {
-                                        if (snapshot.connectionState == ConnectionState.waiting) {
-                                          return CircleAvatar(
-                                            radius: 20,
-                                            backgroundColor: Colors.grey[300],
-                                            child: const CircularProgressIndicator(),
-                                          );
-                                        }
-                                        if (snapshot.hasError || !snapshot.hasData) {
-                                          return const CircleAvatar(
-                                            radius: 20,
-                                            backgroundImage: NetworkImage('https://via.placeholder.com/64'),
-                                          );
-                                        }
-                                        return CircleAvatar(
-                                          radius: 20,
-                                          backgroundImage: NetworkImage(snapshot.data!),
-                                        );
-                                      },
-                                    ),
-                                    title: FutureBuilder<String?>(
-                                      future: _getUserName(post['user_id']),
-                                      builder: (context, snapshot) {
-                                        if (snapshot.connectionState == ConnectionState.waiting) {
-                                          return const Text('Loading...', style: TextStyle(fontWeight: FontWeight.bold));
-                                        }
-                                        if (snapshot.hasError || !snapshot.hasData) {
-                                          return const Text('Anonymous', style: TextStyle(fontWeight: FontWeight.bold));
-                                        }
-                                        return Text(
-                                          snapshot.data!,
-                                          style: const TextStyle(fontWeight: FontWeight.bold),
-                                        );
-                                      },
-                                    ),
-                                    subtitle: Text(
-                                      DateFormat('MMM d, hh:mm a').format(DateTime.parse(post['created_at'])),
-                                      style: const TextStyle(color: Colors.grey),
-                                    ),
-                                    trailing: isCurrentUserPost
-                                        ? IconButton(
-                                      icon: const Icon(Icons.more_vert),
-                                      onPressed: () {
-                                        print('Three-dot clicked for post: ${post['id']}');
-                                        _showPostOptions(context, post);
-                                      },
-                                      iconSize: 24,
-                                    )
-                                        : null,
-                                  ),
-                                  Padding(
-                                    padding: const EdgeInsets.all(8.0),
-                                    child: Image.network(
-                                      post['image_url'],
-                                      width: double.infinity,
-                                      height: 300,
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (context, error, stackTrace) {
-                                        return Container(
-                                          width: double.infinity,
-                                          height: 300,
-                                          color: Colors.grey[300],
-                                          child: const Center(child: Text('Image not available')),
-                                        );
-                                      },
-                                    ),
-                                  ),
-                                  Padding(
-                                    padding: const EdgeInsets.all(8.0),
-                                    child: Text(
-                                      post['caption'],
-                                      style: const TextStyle(fontSize: 16),
-                                    ),
-                                  ),
-                                  Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-                                    child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Row(
-                                          children: [
-                                            IconButton(
-                                              icon: Icon(
-                                                Icons.arrow_upward,
-                                                color: isUpvoted ? Colors.green : Colors.grey,
-                                              ),
-                                              onPressed: () => _votePost(post['id'].toString(), true),
-                                              iconSize: 24,
-                                            ),
-                                            Text('${post['upvotes']} Upvotes'),
-                                          ],
-                                        ),
-                                        Row(
-                                          children: [
-                                            IconButton(
-                                              icon: Icon(
-                                                Icons.arrow_downward,
-                                                color: isDownvoted ? Colors.red : Colors.grey,
-                                              ),
-                                              onPressed: () => _votePost(post['id'].toString(), false),
-                                              iconSize: 24,
-                                            ),
-                                            Text('${post['downvotes']} Downvotes'),
-                                          ],
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
+                          return ElevatedButton(
+                            onPressed: () {
+                              final currentTheme = widget.theme;
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => CommunityPage(theme: currentTheme == buttonText ? null : buttonText),
+                                ),
+                              );
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: buttonColor,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              elevation: 4,
                             ),
-                          );
-                        },
+                            child: Text(buttonText, style: TextStyle(color: Colors.white, fontSize: 14)),
+                          ).animate().fadeIn(duration: 300.ms);
+                        }).toList(),
                       ),
                   ],
                 ),
               ),
-            ),
-          ],
+              // Posts
+              Expanded(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                    boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, -4))],
+                  ),
+                  child: _isLoading
+                      ? Center(child: CircularProgressIndicator(color: Color(0xff5e3e2b)).animate().scale(duration: 400.ms))
+                      : displayedPosts.isEmpty
+                      ? Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Text(
+                      'No posts yet for this theme. Be the first to share!',
+                      style: TextStyle(fontSize: 16, color: Colors.grey[700]),
+                      textAlign: TextAlign.center,
+                    ),
+                  )
+                      : ListView.builder(
+                    padding: EdgeInsets.all(16),
+                    itemCount: displayedPosts.length,
+                    itemBuilder: (context, index) {
+                      final post = displayedPosts[index];
+                      bool isUpvoted = post['userVote'] == 'upvote';
+                      bool isDownvoted = post['userVote'] == 'downvote';
+                      final currentUser = Supabase.instance.client.auth.currentUser;
+                      final isCurrentUserPost = currentUser != null && post['user_id'] == currentUser.id;
+
+                      return Padding(
+                        padding: EdgeInsets.only(bottom: 8),
+                        child: Card(
+                          elevation: 4,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              ListTile(
+                                leading: FutureBuilder<String?>(
+                                  future: _getUserProfileImage(post['user_id']),
+                                  builder: (context, snapshot) {
+                                    if (snapshot.connectionState == ConnectionState.waiting) {
+                                      return CircleAvatar(radius: 20, backgroundColor: Colors.grey[300]);
+                                    }
+                                    return CircleAvatar(
+                                      radius: 20,
+                                      backgroundImage: NetworkImage(snapshot.data ?? 'https://via.placeholder.com/64'),
+                                    );
+                                  },
+                                ),
+                                title: FutureBuilder<String?>(
+                                  future: _getUserName(post['user_id']),
+                                  builder: (context, snapshot) {
+                                    if (snapshot.connectionState == ConnectionState.waiting) {
+                                      return Text('Loading...', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xff5e3e2b)));
+                                    }
+                                    return Text(
+                                      snapshot.data ?? 'Anonymous',
+                                      style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xff5e3e2b)),
+                                    );
+                                  },
+                                ),
+                                subtitle: Text(
+                                  DateFormat('MMM d, hh:mm a').format(DateTime.parse(post['created_at'])),
+                                  style: TextStyle(color: Colors.grey[600]),
+                                ),
+                                trailing: isCurrentUserPost
+                                    ? IconButton(
+                                  icon: Icon(Icons.more_vert, color: Color(0xff5e3e2b)),
+                                  onPressed: () => _showPostOptions(context, post),
+                                )
+                                    : null,
+                              ),
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(12),
+                                child: Image.network(
+                                  post['image_url'],
+                                  width: double.infinity,
+                                  height: 300,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) => Container(
+                                    width: double.infinity,
+                                    height: 300,
+                                    color: Colors.grey[300],
+                                    child: Center(child: Text('Image not available')),
+                                  ),
+                                ),
+                              ),
+                              Padding(
+                                padding: EdgeInsets.all(12),
+                                child: Text(
+                                  post['caption'],
+                                  style: TextStyle(fontSize: 16, color: Colors.black87),
+                                ),
+                              ),
+                              Padding(
+                                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        IconButton(
+                                          icon: Icon(Icons.arrow_upward, color: isUpvoted ? Colors.green : Colors.grey, size: 28),
+                                          onPressed: () => _votePost(post['id'].toString(), true),
+                                        ),
+                                        Text('${post['upvotes']}', style: TextStyle(color: Colors.grey[700])),
+                                      ],
+                                    ),
+                                    Row(
+                                      children: [
+                                        IconButton(
+                                          icon: Icon(Icons.arrow_downward, color: isDownvoted ? Colors.red : Colors.grey, size: 28),
+                                          onPressed: () => _votePost(post['id'].toString(), false),
+                                        ),
+                                        Text('${post['downvotes']}', style: TextStyle(color: Colors.grey[700])),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ).animate().fadeIn(duration: 300.ms).slideY(begin: 0.1),
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -812,16 +731,8 @@ class ThemedDiscussionPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => CommunityPage(theme: theme),
-        ),
-      );
+      Navigator.push(context, MaterialPageRoute(builder: (context) => CommunityPage(theme: theme)));
     });
-
-    return const Scaffold(
-      body: Center(child: CircularProgressIndicator()),
-    );
+    return Scaffold(body: Center(child: CircularProgressIndicator()));
   }
 }

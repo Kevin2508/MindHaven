@@ -77,24 +77,24 @@ class _QuestionPageState extends State<QuestionPage> {
     }
 
     if (widget.questionNumber < widget.totalQuestions) {
-      Navigator.pushReplacementNamed(
+      Navigator.pushNamed(
         context,
         '/question${widget.questionNumber + 1}',
       );
     } else {
-      Navigator.pushReplacementNamed(context, '/home');
+      Navigator.pushNamed(context, '/home');
     }
   }
 
   Future<bool> _onWillPop() async {
     if (widget.questionNumber > 2) { // Start from question 2 since mood is question 1
-      Navigator.pushReplacementNamed(
+      Navigator.pushNamed(
         context,
         '/question${widget.questionNumber - 1}',
       );
       return false;
     } else if (widget.questionNumber == 2) {
-      Navigator.pushReplacementNamed(context, '/mood'); // Back to mood page
+      Navigator.pushNamed(context, '/mood'); // Back to mood page
       return false;
     } else {
       return false; // Prevent default behavior for question 1 (mood)

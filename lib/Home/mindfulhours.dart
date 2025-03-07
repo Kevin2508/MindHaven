@@ -131,7 +131,7 @@ class _StressReliefPageState extends State<StressReliefPage> with SingleTickerPr
 
   void _goToExercisePage() {
     _saveListenedTime(); // Save time before navigating
-    Navigator.pushReplacement(
+    Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const ExercisePage()),
     );

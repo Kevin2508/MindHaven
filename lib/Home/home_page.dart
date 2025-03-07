@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:mindhaven/Community/community.dart';
 import 'package:mindhaven/Home/exercise_page.dart';
 import 'package:mindhaven/Home/health_journal.dart';
@@ -39,7 +40,7 @@ class _HomePageState extends State<HomePage> {
       await _loadUserData();
       if (!_isProfileComplete) {
         if (mounted) {
-          Navigator.pushReplacement(
+          Navigator.push(
             context,
             MaterialPageRoute(builder: (context) => const MoodPage()),
           );
@@ -202,47 +203,50 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(
-        child: OrientationBuilder(
-          builder: (context, orientation) {
-            return Stack(
-              children: [
-                Container(
-                  color: const Color(0xfff4eee0),
-                  child: SingleChildScrollView(
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(
-                        minHeight: MediaQuery.of(context).size.height,
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildHeader(orientation),
-                          SizedBox(height: MediaQuery.of(context).size.height * 0.03),
-                          if (!_isAssessmentDoneToday) _buildMoodButton(orientation),
-                          SizedBox(height: MediaQuery.of(context).size.height * 0.03),
-                          _buildSectionTitle('Mental Health Metrics', orientation),
-                          SizedBox(height: MediaQuery.of(context).size.height * 0.02),
-                          _buildMetricsRow(orientation),
-                          SizedBox(height: MediaQuery.of(context).size.height * 0.03),
-                          _buildSectionTitle('AI Therapy Chatbot', orientation),
-                          _buildChatbotButton(),
-                          SizedBox(height: MediaQuery.of(context).size.height * 0.03),
-                          _buildSectionTitle('Mindful Tracker', orientation),
-                          _buildTrackerButtons(orientation),
-                          SizedBox(height: MediaQuery.of(context).size.height * 0.1),
-                        ],
+    return WillPopScope(
+      onWillPop: _onBackPressed,
+      child: Scaffold(
+        body: SafeArea(
+          child: OrientationBuilder(
+            builder: (context, orientation) {
+              return Stack(
+                children: [
+                  Container(
+                    color: const Color(0xfff4eee0),
+                    child: SingleChildScrollView(
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          minHeight: MediaQuery.of(context).size.height,
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildHeader(orientation),
+                            SizedBox(height: MediaQuery.of(context).size.height * 0.03),
+                            if (!_isAssessmentDoneToday) _buildMoodButton(orientation),
+                            SizedBox(height: MediaQuery.of(context).size.height * 0.03),
+                            _buildSectionTitle('Mental Health Metrics', orientation),
+                            SizedBox(height: MediaQuery.of(context).size.height * 0.02),
+                            _buildMetricsRow(orientation),
+                            SizedBox(height: MediaQuery.of(context).size.height * 0.03),
+                            _buildSectionTitle('AI Therapy Chatbot', orientation),
+                            _buildChatbotButton(),
+                            SizedBox(height: MediaQuery.of(context).size.height * 0.03),
+                            _buildSectionTitle('Mindful Tracker', orientation),
+                            _buildTrackerButtons(orientation),
+                            SizedBox(height: MediaQuery.of(context).size.height * 0.1),
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ],
-            );
-          },
+                ],
+              );
+            },
+          ),
         ),
+        bottomNavigationBar: _buildBottomNavigationBar(),
       ),
-      bottomNavigationBar: _buildBottomNavigationBar(),
     );
   }
 
@@ -562,7 +566,7 @@ class _HomePageState extends State<HomePage> {
           _buildFooterButton(
             icon: Icons.camera,
             isActive: false,
-            onPressed: () => Navigator.pushReplacement(
+            onPressed: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (context) => const PhotoJournalPage()),
             ),
@@ -807,7 +811,34 @@ class _HomePageState extends State<HomePage> {
       ),
     );
   }
+  Future<bool> _onBackPressed() async {
+    // Show a confirmation dialog
+    bool shouldExit = await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Exit App'),
+        content: const Text('Are you sure you want to exit?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false), // Stay in the app
+            child: const Text('No'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true), // Exit the app
+            child: const Text('Yes'),
+          ),
+        ],
+      ),
+    );
 
+    // If the user confirms, exit the app
+    if (shouldExit ?? false) {
+      SystemNavigator.pop(); // Close the app
+    }
+
+    // Return false to prevent default back navigation
+    return false;
+  }
   Widget _buildFooterButton({
     required IconData icon,
     required bool isActive,

@@ -121,7 +121,7 @@ class _SignUpPageState extends State<SignUpPage> {
                                 password: password,
                               );
                               if (response.user != null) {
-                                Navigator.pushReplacementNamed(context, '/home');
+                                Navigator.pushNamed(context, '/home');
                               }
                             } catch (e) {
                               ScaffoldMessenger.of(context).showSnackBar(
@@ -162,7 +162,7 @@ class _SignUpPageState extends State<SignUpPage> {
                                 ),
                                 recognizer: TapGestureRecognizer()
                                   ..onTap = () {
-                                    Navigator.pushReplacementNamed(context, '/login');
+                                    Navigator.pushNamed(context, '/login');
                                   },
                               ),
                             ],

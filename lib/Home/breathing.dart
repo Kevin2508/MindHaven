@@ -116,7 +116,7 @@ class _BreathingExercisePageState extends State<BreathingExercisePage> {
   void _completeExercise() {
     if (_startTime != null) {
       int elapsedSeconds = DateTime.now().difference(_startTime!).inSeconds;
-      Navigator.pushReplacement(
+      Navigator.push(
         context,
         MaterialPageRoute(
           builder: (context) => ExerciseCompletedPage(durationSeconds: elapsedSeconds.toDouble()),
@@ -180,7 +180,7 @@ class _BreathingExercisePageState extends State<BreathingExercisePage> {
 
   void _goToHomePage() {
     _stopTimer(); // Stop timer and video, save time before navigating
-    Navigator.pushReplacement(
+    Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const HomePage()),
     );

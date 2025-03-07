@@ -78,7 +78,7 @@ class _ExercisePageState extends State<ExercisePage> {
   }
 
   void _goToHomePage() {
-    Navigator.pushReplacement(
+    Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const HomePage()),
     );

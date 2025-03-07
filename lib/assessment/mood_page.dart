@@ -56,7 +56,7 @@ class _MoodPageState extends State<MoodPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Mood and score saved successfully!')),
       );
-      Navigator.pushReplacementNamed(context, '/question2'); // Navigate to question 2
+      Navigator.pushNamed(context, '/question2'); // Navigate to question 2
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error saving mood and score: $e')),

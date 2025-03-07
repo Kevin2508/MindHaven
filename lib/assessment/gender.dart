@@ -40,7 +40,7 @@ class _GenderPageState extends State<GenderPage> {
           const SnackBar(content: Text('Gender stored successfully!')),
         );
       }
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => MoodPage()));
+      Navigator.push(context, MaterialPageRoute(builder: (context) => MoodPage()));
     } on PostgrestException catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Postgrest Error: ${e.message} (Code: ${e.code}, Details: ${e.details})')),

@@ -73,7 +73,7 @@ class _NewJournalEntryPageState extends State<NewJournalEntryPage> {
         }
 
         if (mounted) {
-          Navigator.pushReplacement(
+          Navigator.push(
             context,
             MaterialPageRoute(builder: (context) => const JournalPage()),
           );
@@ -108,7 +108,7 @@ class _NewJournalEntryPageState extends State<NewJournalEntryPage> {
                   children: [
                     IconButton(
                       icon: const Icon(Icons.arrow_back),
-                      onPressed: () => Navigator.pushReplacement(
+                      onPressed: () => Navigator.push(
                         context,
                         MaterialPageRoute(builder: (context) => const JournalPage()),
                       ),

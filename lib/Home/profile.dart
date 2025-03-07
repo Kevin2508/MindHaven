@@ -27,7 +27,7 @@ class _ProfilePageState extends State<ProfilePage> {
   Future<void> _loadUserData() async {
     final supabase = Supabase.instance.client;
     final user = supabase.auth.currentUser;
-    debugPrint('Loading user data for user: ${user?.id}');
+    print('Loading user data for user: ${user?.id}');
 
     if (user != null) {
       try {
@@ -37,31 +37,37 @@ class _ProfilePageState extends State<ProfilePage> {
             .eq('id', user.id)
             .single();
 
-        debugPrint('Supabase response: $response');
+        print('Loaded profile data: $response');
 
-        setState(() {
-          userName = response['full_name'] ?? user.email?.split('@')[0] ?? 'User';
-          profileImageUrl = response['avatar_url'] ?? 'https://via.placeholder.com/128';
-          userAge = response['age'] as int?;
-          _nameController.text = userName ?? '';
-          _isLoading = false;
-        });
+        if (mounted) {
+          setState(() {
+            userName = response['full_name'] ?? user.email?.split('@')[0] ?? 'User';
+            profileImageUrl = response['avatar_url'] ?? 'https://via.placeholder.com/128';
+            userAge = response['age'] as int?;
+            _nameController.text = userName ?? '';
+            _isLoading = false;
+          });
+        }
       } catch (e) {
-        debugPrint('Error fetching profile data: $e');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading profile: $e')),
-        );
+        print('Error loading profile data: $e');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error loading profile: $e')),
+          );
+          setState(() {
+            _isLoading = false;
+            profileImageUrl = 'https://via.placeholder.com/128';
+          });
+        }
+      }
+    } else {
+      print('No authenticated user found');
+      if (mounted) {
         setState(() {
           _isLoading = false;
           profileImageUrl = 'https://via.placeholder.com/128';
         });
       }
-    } else {
-      debugPrint('No authenticated user found');
-      setState(() {
-        _isLoading = false;
-        profileImageUrl = 'https://via.placeholder.com/128';
-      });
     }
   }
 
@@ -69,7 +75,7 @@ class _ProfilePageState extends State<ProfilePage> {
     final picker = ImagePicker();
     final pickedFile = await picker.pickImage(source: ImageSource.gallery);
 
-    if (pickedFile != null) {
+    if (pickedFile != null && mounted) {
       setState(() {
         _newProfileImage = File(pickedFile.path);
       });
@@ -84,9 +90,7 @@ class _ProfilePageState extends State<ProfilePage> {
       return;
     }
 
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
 
     try {
       final supabase = Supabase.instance.client;
@@ -95,70 +99,88 @@ class _ProfilePageState extends State<ProfilePage> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Please log in to update your profile')),
         );
-        setState(() {
-          _isLoading = false;
-        });
+        setState(() => _isLoading = false);
         return;
+      }
+
+      // Ensure profile exists
+      final existingProfile = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('id', user.id)
+          .maybeSingle();
+      print('Existing profile check: $existingProfile');
+
+      if (existingProfile == null) {
+        // Create new profile if it doesn’t exist
+        print('Creating new profile for id: ${user.id}');
+        await supabase.from('profiles').insert({
+          'id': user.id, // Explicitly set id
+          'full_name': _nameController.text.trim(),
+        });
       }
 
       Map<String, dynamic> updates = {
         'full_name': _nameController.text.trim(),
       };
 
+      String? newImageUrl;
       if (_newProfileImage != null) {
-        try {
-          final bucketList = await supabase.storage.listBuckets();
-          final bucketExists = bucketList.any((bucket) => bucket.name.toLowerCase() == 'profile_pictures'.toLowerCase());
-          if (!bucketExists) {
-            throw Exception('Bucket "profile_pictures" not found in Supabase Storage');
-          }
+        final fileName = '${user.id}_profile.jpg';
+        final bytes = await _newProfileImage!.readAsBytes();
+        print('Uploading image: $fileName');
 
-          final fileName = '${user.id}_profile.jpg';
-          final bytes = await _newProfileImage!.readAsBytes();
+        try {
           await supabase.storage.from('profile_pictures').uploadBinary(
             fileName,
             bytes,
-            fileOptions: const FileOptions(contentType: 'image/jpeg'),
+            fileOptions: const FileOptions(
+              contentType: 'image/jpeg',
+              upsert: true, // Overwrite if exists
+            ),
           );
 
-          final imageUrl = supabase.storage.from('profile_pictures').getPublicUrl(fileName);
-          updates['avatar_url'] = imageUrl;
-        } catch (e) {
-          debugPrint('Error with bucket or upload: $e');
+          newImageUrl = supabase.storage.from('profile_pictures').getPublicUrl(fileName);
+          updates['avatar_url'] = newImageUrl;
+          print('Image uploaded, new URL: $newImageUrl');
+        } on StorageException catch (e) {
+          print('Storage exception: $e');
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error uploading profile picture: $e')),
+            SnackBar(content: Text('Storage error: ${e.message}')),
           );
-          setState(() {
-            _isLoading = false;
-          });
+          setState(() => _isLoading = false);
           return;
         }
       }
 
+      // Update the profile
+      print('Updating profile with: $updates');
       await supabase.from('profiles').update(updates).eq('id', user.id);
 
-      setState(() {
-        userName = _nameController.text.trim();
-        if (_newProfileImage != null) {
-          profileImageUrl = updates['avatar_url'];
-        }
-        _newProfileImage = null;
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          userName = _nameController.text.trim();
+          if (_newProfileImage != null) {
+            profileImageUrl = newImageUrl ?? profileImageUrl;
+          }
+          _newProfileImage = null;
+          _isLoading = false;
+        });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Profile updated successfully!')),
-      );
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Profile updated successfully!')),
+        );
 
-      Navigator.pop(context);
+        Navigator.pop(context);
+      }
     } catch (e) {
-      debugPrint('Error updating profile: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error updating profile: $e')),
-      );
-      setState(() {
-        _isLoading = false;
-      });
+      print('Error in updateProfile: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error updating profile: $e')),
+        );
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -172,10 +194,7 @@ class _ProfilePageState extends State<ProfilePage> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text(
-                'Cancel',
-                style: TextStyle(color: Colors.grey),
-              ),
+              child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
             ),
             TextButton(
               onPressed: () async {
@@ -183,15 +202,14 @@ class _ProfilePageState extends State<ProfilePage> {
                   final supabase = Supabase.instance.client;
                   await supabase.auth.signOut();
                   if (mounted) {
-                    Navigator.pop(context); // Close the dialog
+                    Navigator.pop(context); // Close dialog
                     Navigator.pushNamedAndRemoveUntil(
                       context,
-                      '/login', // Assuming your login route is '/login'
-                          (route) => false, // Remove all previous routes
+                      '/login',
+                          (route) => false,
                     );
                   }
                 } catch (e) {
-                  debugPrint('Error logging out: $e');
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(content: Text('Error logging out: $e')),
@@ -199,10 +217,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   }
                 }
               },
-              child: const Text(
-                'Logout',
-                style: TextStyle(color: Colors.red),
-              ),
+              child: const Text('Logout', style: TextStyle(color: Colors.red)),
             ),
           ],
         );
@@ -211,7 +226,6 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   void _showEditProfileDialog() {
-    debugPrint('Showing Edit Profile Dialog - isLoading: $_isLoading, userName: $userName, profileImageUrl: $profileImageUrl');
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -222,7 +236,7 @@ class _ProfilePageState extends State<ProfilePage> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 GestureDetector(
-                  onTap: _pickImage,
+                  onTap: _isLoading ? null : _pickImage,
                   child: CircleAvatar(
                     radius: 50,
                     backgroundImage: _newProfileImage != null
@@ -236,28 +250,29 @@ class _ProfilePageState extends State<ProfilePage> {
                 SizedBox(height: MediaQuery.of(context).size.height * 0.02),
                 TextField(
                   controller: _nameController,
-                  decoration: InputDecoration(
+                  decoration: const InputDecoration(
                     hintText: 'Enter your name',
                     border: OutlineInputBorder(),
                     labelText: 'Name',
                   ),
                   maxLines: 1,
+                  enabled: !_isLoading,
                 ),
               ],
             ),
           ),
           actions: [
             TextButton(
-              onPressed: () {
-                setState(() {
-                  _newProfileImage = null;
-                });
+              onPressed: _isLoading
+                  ? null
+                  : () {
+                setState(() => _newProfileImage = null);
                 Navigator.pop(context);
               },
               child: const Text('Cancel'),
             ),
             TextButton(
-              onPressed: _updateProfile,
+              onPressed: _isLoading ? null : _updateProfile,
               child: const Text('Update'),
             ),
           ],
@@ -268,7 +283,6 @@ class _ProfilePageState extends State<ProfilePage> {
 
   @override
   Widget build(BuildContext context) {
-    debugPrint('Building ProfilePage - isLoading: $_isLoading, userName: $userName, profileImageUrl: $profileImageUrl');
     return Scaffold(
       backgroundColor: const Color(0xfff4eee0),
       appBar: AppBar(
@@ -284,7 +298,6 @@ class _ProfilePageState extends State<ProfilePage> {
             ? const Center(child: CircularProgressIndicator())
             : OrientationBuilder(
           builder: (context, orientation) {
-            debugPrint('Orientation: $orientation');
             return Padding(
               padding: EdgeInsets.symmetric(
                 horizontal: MediaQuery.of(context).size.width * 0.05,
@@ -321,10 +334,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     ),
                   SizedBox(height: MediaQuery.of(context).size.height * 0.02),
                   ElevatedButton(
-                    onPressed: () {
-                      debugPrint('Edit Profile button pressed');
-                      _showEditProfileDialog();
-                    },
+                    onPressed: _showEditProfileDialog,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF926247),
                       minimumSize: Size(double.infinity, MediaQuery.of(context).size.height * 0.06),

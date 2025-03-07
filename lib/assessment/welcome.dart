@@ -32,7 +32,7 @@ class _WelcomePageState extends State<WelcomePage> {
         curve: Curves.easeInOut,
       );
     } else {
-      Navigator.pushReplacementNamed(context, '/EnterNamePage');
+      Navigator.pushNamed(context, '/EnterNamePage');
     }
   }
 

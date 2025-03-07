@@ -152,7 +152,7 @@ class _HealthJournalPageState extends State<HealthJournalPage> {
                       IconButton(
                         icon: Icon(Icons.arrow_back),
                         onPressed: (){
-                          Navigator.pushReplacement(
+                          Navigator.push(
                             context,
                             MaterialPageRoute(builder: (context) => const HomePage()),
                           );

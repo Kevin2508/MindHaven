@@ -49,7 +49,7 @@ class _AgePageState extends State<AgePage> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Age stored successfully!')),
       );
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => GenderPage())); // Changed to navigate to ProfilePicturePage
+      Navigator.push(context, MaterialPageRoute(builder: (context) => GenderPage())); // Changed to navigate to ProfilePicturePage
     } on PostgrestException catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Postgrest Error: ${e.message} (Code: ${e.code}, Details: ${e.details})')),

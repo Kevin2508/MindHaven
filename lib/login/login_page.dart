@@ -69,7 +69,7 @@ class _LoginPageState extends State<LoginPage> {
     try {
       final isFirstTime = await _isFirstTimeUser(userId);
       if (mounted) {
-        Navigator.pushReplacementNamed(
+        Navigator.pushNamed(
           context,
           isFirstTime ? '/welcome' : '/home',
         );
@@ -267,7 +267,7 @@ class _LoginPageState extends State<LoginPage> {
                                     recognizer: TapGestureRecognizer()
                                       ..onTap = () {
                                         if (!_isLoading) {
-                                          Navigator.pushReplacement(
+                                          Navigator.push(
                                             context,
                                             MaterialPageRoute(builder: (context) => const SignUpPage()),
                                           );

@@ -611,14 +611,14 @@ class _CommunityPageState extends State<CommunityPage> {
                           onPressed: () {
                             final currentTheme = widget.theme;
                             if (currentTheme == buttonText) {
-                              Navigator.pushReplacement(
+                              Navigator.push(
                                 context,
                                 MaterialPageRoute(
                                   builder: (context) => const CommunityPage(),
                                 ),
                               );
                             } else {
-                              Navigator.pushReplacement(
+                              Navigator.push(
                                 context,
                                 MaterialPageRoute(
                                   builder: (context) => CommunityPage(theme: buttonText),
@@ -812,7 +812,7 @@ class ThemedDiscussionPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Navigator.pushReplacement(
+      Navigator.push(
         context,
         MaterialPageRoute(
           builder: (context) => CommunityPage(theme: theme),

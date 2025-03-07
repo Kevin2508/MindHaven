@@ -104,7 +104,7 @@ class _ExerciseCompletedPageState extends State<ExerciseCompletedPage> {
                   width: double.infinity,
                   child: ElevatedButton(
                     onPressed: () {
-                      Navigator.pushReplacement(
+                      Navigator.push(
                         context,
                         MaterialPageRoute(builder: (context) => const HomePage()),
                       );

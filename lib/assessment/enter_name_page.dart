@@ -38,7 +38,7 @@ class _EnterNamePageState extends State<EnterNamePage> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Name stored successfully!')),
         );
-        Navigator.pushReplacement(context, MaterialPageRoute(builder: (context)=>AgePage()));
+        Navigator.push(context, MaterialPageRoute(builder: (context)=>AgePage()));
       }
     } on PostgrestException catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(

@@ -34,6 +34,7 @@ class ChatProvider with ChangeNotifier {
   void addMessage(String role, String content) {
     _sessions[_currentSessionId] ??= []; // Ensure the session exists
     _sessions[_currentSessionId]!.add({"role": role, "content": content});
+    saveSessions();
     notifyListeners();
   }
 
@@ -53,6 +54,7 @@ class ChatProvider with ChangeNotifier {
         _currentSessionId = "Session 1"; // Default session
         _sessions[_currentSessionId] = [];
       }
+      saveSessions();
       notifyListeners();
     }
   }

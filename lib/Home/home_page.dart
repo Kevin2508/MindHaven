@@ -6,13 +6,15 @@ import 'package:mindhaven/Home/health_journal.dart';
 import 'package:mindhaven/Home/photo_journal.dart';
 import 'package:mindhaven/Home/profile.dart';
 import 'package:mindhaven/assessment/mood_page.dart';
+import 'package:mindhaven/chat/chat_provider.dart';
 import 'package:mindhaven/chat/chat_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 import 'package:mindhaven/Home/daily_journal.dart';
 import 'package:mindhaven/Home/mindfulhours.dart';
 import 'package:mindhaven/Community/welcome.dart';
-
+import 'package:mindhaven/Services/notification_page.dart';
+import 'package:provider/provider.dart';
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
@@ -28,13 +30,23 @@ class _HomePageState extends State<HomePage> {
   bool _isProfileComplete = false;
   int _currentScore = 0;
   bool _isAssessmentDoneToday = false;
+  int _chatSessionCount = 0;
 
   @override
   void initState() {
+
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      NotificationService().sendRecommendationNotification();});
     _initializeData();
   }
-
+  Future<void> _fetchChatSessionCount() async {
+    final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+    await chatProvider.loadSessions(); // Ensure sessions are loaded
+    setState(() {
+      _chatSessionCount = chatProvider.sessionIds.length; // Update session count
+    });
+  }
   Future<void> _initializeData() async {
     try {
       await _loadUserData();
@@ -49,6 +61,7 @@ class _HomePageState extends State<HomePage> {
         await Future.wait([
           _calculateCurrentScore(),
           _calculateStreak(),
+          _fetchChatSessionCount(), // Fetch chat session count
         ]);
       }
     } catch (e) {
@@ -235,6 +248,7 @@ class _HomePageState extends State<HomePage> {
                             _buildSectionTitle('Mindful Tracker', orientation),
                             _buildTrackerButtons(orientation),
                             SizedBox(height: MediaQuery.of(context).size.height * 0.1),
+
                           ],
                         ),
                       ),
@@ -437,10 +451,9 @@ class _HomePageState extends State<HomePage> {
     return Padding(
       padding: const EdgeInsets.only(top: 10, left: 10.0, right: 10.0),
       child: ElevatedButton(
-        onPressed: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => const ChatScreen()),
-        ),
+        onPressed: () {
+          Navigator.push(context, MaterialPageRoute(builder: (context) => ChatScreen()));
+        },
         style: ElevatedButton.styleFrom(
           backgroundColor: const Color(0xff926247),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -455,13 +468,13 @@ class _HomePageState extends State<HomePage> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Padding(
+              Padding(
                 padding: EdgeInsets.all(16.0),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      '2541',
+                      '$_chatSessionCount',
                       style: TextStyle(
                         fontSize: 54,
                         color: Colors.white,

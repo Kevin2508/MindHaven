@@ -238,7 +238,7 @@ class _GraphPageState extends State<GraphPage> {
       final user = supabase.auth.currentUser;
       if (user != null) {
         final history = await supabase
-            .from('mood_entries')
+            .from('mental_score_history')
             .select('mood, timestamp')
             .eq('user_id', user.id)
             .order('timestamp', ascending: false)
@@ -246,7 +246,7 @@ class _GraphPageState extends State<GraphPage> {
 
         setState(() {
           final fetchedMoods = List<Map<String, dynamic>>.from(history);
-          print('Fetched Moods: $fetchedMoods'); // Debug print
+          print('Fetched Moods from mental_score_history: $fetchedMoods'); // Debug print
           _moodHistory = _getLast7DaysMoods(fetchedMoods);
           print('Processed Mood History: $_moodHistory'); // Debug print
         });
@@ -310,7 +310,6 @@ class _GraphPageState extends State<GraphPage> {
     }
     return last7Days;
   }
-
   int _calculateQuestionScore(int questionNumber, String answer) {
     switch (answer) {
       case 'Never':
@@ -611,57 +610,7 @@ class _GraphPageState extends State<GraphPage> {
               ],
             ),
           ),
-          Align(
-            alignment: const Alignment(0, 1),
-            child: Container(
-              height: 80,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(40),
-                  topRight: Radius.circular(40),
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.grey.withOpacity(0.2),
-                    spreadRadius: 2,
-                    blurRadius: 5,
-                    offset: const Offset(0, -3),
-                  ),
-                ],
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _buildFooterButton(
-                    icon: Icons.home,
-                    isActive: true,
-                    onPressed: () {},
-                  ),
-                  _buildFooterButton(
-                    icon: Icons.message,
-                    isActive: false,
-                    onPressed: () {},
-                  ),
-                  _buildFooterButton(
-                    icon: Icons.chat,
-                    isActive: false,
-                    onPressed: () {},
-                  ),
-                  _buildFooterButton(
-                    icon: Icons.bar_chart,
-                    isActive: false,
-                    onPressed: () {},
-                  ),
-                  _buildFooterButton(
-                    icon: Icons.person,
-                    isActive: false,
-                    onPressed: () {},
-                  ),
-                ],
-              ),
-            ),
-          ),
+
         ],
       ),
     );

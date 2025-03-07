@@ -1,11 +1,14 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:mindhaven/Home/home_page.dart';
+import 'package:google_ml_kit/google_ml_kit.dart';
+import 'package:image/image.dart' as img; // For image processing
 import 'gallery_page.dart';
 
 class PhotoJournalPage extends StatefulWidget {
@@ -23,7 +26,13 @@ class _PhotoJournalPageState extends State<PhotoJournalPage> {
   bool _isLoading = true;
   String? _errorMessage;
   String _selectedMood = 'Neutral';
-  final List<String> _moods = ['Sad', 'Angry', 'Neutral', 'Happy', 'Very Happy'];
+  final List<String> _moods = ['Sad', 'Angry', 'Neutral', 'Happy', 'Very Happy', 'Very Sad'];
+  final FaceDetector _faceDetector = GoogleMlKit.vision.faceDetector(
+    FaceDetectorOptions(
+      enableContours: true, // Enable facial landmarks
+      enableClassification: true, // Enable smile/eye detection
+    ),
+  );
 
   @override
   void initState() {
@@ -49,8 +58,8 @@ class _PhotoJournalPageState extends State<PhotoJournalPage> {
             _errorMessage = 'Camera permission permanently denied. Please enable it in app settings.';
           });
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text('Camera permission required'),
+             SnackBar(
+              content: Text('Camera permission required'),
               action: SnackBarAction(
                 label: 'Settings',
                 onPressed: () => openAppSettings(),
@@ -74,7 +83,7 @@ class _PhotoJournalPageState extends State<PhotoJournalPage> {
         _errorMessage = 'Camera permission permanently denied. Please enable it in app settings.';
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+         SnackBar(
           content: const Text('Camera permission permanently denied'),
           action: SnackBarAction(
             label: 'Settings',
@@ -127,6 +136,99 @@ class _PhotoJournalPageState extends State<PhotoJournalPage> {
     }
   }
 
+  Future<String> _detectFacialExpression(XFile photo) async {
+    try {
+      final inputImage = InputImage.fromFilePath(photo.path);
+      final faces = await _faceDetector.processImage(inputImage);
+
+      if (faces.isEmpty) {
+        print('No face detected');
+        return 'Neutral'; // Default mood if no face is detected
+      }
+
+      for (Face face in faces) {
+        // Classification data
+        final smileProb = face.smilingProbability ?? 0.0;
+        final leftEyeOpen = face.leftEyeOpenProbability ?? 0.5;
+        final rightEyeOpen = face.rightEyeOpenProbability ?? 0.5;
+
+        // Contour data for advanced detection
+        final upperLipTop = face.contours[FaceContourType.upperLipTop]?.points;
+        final upperLipBottom = face.contours[FaceContourType.upperLipBottom]?.points;
+        final lowerLipTop = face.contours[FaceContourType.lowerLipTop]?.points;
+        final lowerLipBottom = face.contours[FaceContourType.lowerLipBottom]?.points;
+        final leftEyebrowTop = face.contours[FaceContourType.leftEyebrowTop]?.points;
+        final rightEyebrowTop = face.contours[FaceContourType.rightEyebrowTop]?.points;
+
+        print('Debug - Smile: $smileProb, LeftEye: $leftEyeOpen, RightEye: $rightEyeOpen');
+
+        // Approximate mouth height and width
+        // Approximate mouth height and width
+        // Approximate mouth height and width
+        int? mouthTopY, mouthBottomY, mouthLeftX, mouthRightX;
+        double? mouthHeight, mouthWidth;
+        if (upperLipTop != null && lowerLipBottom != null && upperLipTop.isNotEmpty && lowerLipBottom.isNotEmpty) {
+          try {
+            mouthTopY = upperLipTop.map((p) => p.y).reduce((a, b) => a < b ? a : b); // Min Y
+            mouthBottomY = lowerLipBottom.map((p) => p.y).reduce((a, b) => a > b ? a : b); // Max Y
+            mouthLeftX = upperLipTop.map((p) => p.x).reduce((a, b) => a < b ? a : b); // Min X
+            mouthRightX = lowerLipBottom.map((p) => p.x).reduce((a, b) => a > b ? a : b); // Max X
+            mouthHeight = (mouthBottomY?.toDouble() ?? 0.0) - (mouthTopY?.toDouble() ?? 0.0);
+            mouthWidth = (mouthRightX?.toDouble() ?? 0.0) - (mouthLeftX?.toDouble() ?? 0.0);
+
+            print('Debug - Mouth: TopY=$mouthTopY, BottomY=$mouthBottomY, Height=$mouthHeight, Width=$mouthWidth, Ratio=${mouthWidth! / mouthHeight!}');
+          } catch (e) {
+            print('Error calculating mouth metrics: $e');
+            // Fallback values to avoid breaking the logic
+            mouthTopY = null;
+            mouthBottomY = null;
+            mouthLeftX = null;
+            mouthRightX = null;
+            mouthHeight = null;
+            mouthWidth = null;
+          }
+        } else {
+          print('Debug - Mouth contours not detected');
+        }
+
+        // Very Happy: High smile probability and wide mouth
+        if (smileProb > 0.9 && mouthWidth != null && mouthHeight != null && mouthWidth / mouthHeight > 2.5) {
+          print('Detected Very Happy with smile: $smileProb, mouth ratio: ${mouthWidth / mouthHeight}');
+          return 'Very Happy';
+        }
+        // Happy: Moderate smile probability
+        else if (smileProb > 0.7) {
+          print('Detected Happy with smile: $smileProb');
+          return 'Happy';
+        }
+        // Very Sad: Closed eyes and extreme mouth downturn
+        else if (leftEyeOpen < 0.2 && rightEyeOpen < 0.2 && mouthBottomY != null && mouthTopY != null && mouthBottomY > mouthTopY + 6) {
+          print('Detected Very Sad with eyes: $leftEyeOpen/$rightEyeOpen, mouth downturn: ${mouthBottomY - mouthTopY}');
+          return 'Very Sad';
+        }
+        // Sad: Low smile, downturned mouth, or slight brow furrow
+        else if (smileProb < 0.3 && mouthBottomY != null && mouthTopY != null && mouthBottomY > mouthTopY + 1 &&
+            mouthWidth != null && mouthHeight != null && mouthWidth / mouthHeight < 1.1) {
+          print('Detected Sad with smile: $smileProb, mouth downturn: ${mouthBottomY - mouthTopY}, ratio: ${mouthWidth / mouthHeight}');
+          return 'Sad';
+        }
+        // Angry: Low smile, narrowed eyes, and slight brow furrow
+        else if (smileProb < 0.3 && leftEyeOpen < 0.6 && rightEyeOpen < 0.6 &&
+            leftEyebrowTop != null && rightEyebrowTop != null &&
+            leftEyebrowTop.last.y - leftEyebrowTop.first.y > 3 &&
+            rightEyebrowTop.last.y - rightEyebrowTop.first.y > 3) {
+          print('Detected Angry with smile: $smileProb, eyes: $leftEyeOpen/$rightEyeOpen, brow diff: ${leftEyebrowTop.last.y - leftEyebrowTop.first.y}');
+          return 'Angry';
+        }
+      }
+      print('Falling back to Neutral');
+      return 'Neutral';
+    } catch (e) {
+      print('Error detecting facial expression: $e');
+      return 'Neutral'; // Fallback if detection fails
+    }
+  }
+
   Future<void> _takePhoto() async {
     if (_controller != null && _controller!.value.isInitialized) {
       final directory = await getTemporaryDirectory();
@@ -135,6 +237,13 @@ class _PhotoJournalPageState extends State<PhotoJournalPage> {
         final XFile photo = await _controller!.takePicture();
         final file = File(filePath);
         await file.writeAsBytes(await photo.readAsBytes());
+
+        // Detect facial expression
+        final detectedMood = await _detectFacialExpression(photo);
+        setState(() {
+          _selectedMood = detectedMood;
+        });
+        print('Detected mood: $_selectedMood');
 
         final supabase = Supabase.instance.client;
         final user = supabase.auth.currentUser;
@@ -167,7 +276,7 @@ class _PhotoJournalPageState extends State<PhotoJournalPage> {
 
           await supabase.from('photo_entries').insert(photoEntry).timeout(const Duration(seconds: 10));
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Photo saved successfully')),
+            SnackBar(content: Text('Photo saved successfully with mood: $_selectedMood')),
           );
           Navigator.push(
             context,
@@ -195,6 +304,7 @@ class _PhotoJournalPageState extends State<PhotoJournalPage> {
   @override
   void dispose() {
     _controller?.dispose();
+    _faceDetector.close();
     super.dispose();
   }
 
@@ -254,18 +364,23 @@ class _PhotoJournalPageState extends State<PhotoJournalPage> {
         )
             : _isCameraReady && _controller != null
             ? Stack(
-          fit: StackFit.expand, // Ensure Stack fills the screen
+          fit: StackFit.expand,
           children: [
-            // Camera preview with proper scaling
+            // Camera preview with proper scaling and mirroring fix
             Center(
               child: FittedBox(
-                fit: BoxFit.cover, // Cover the screen while maintaining aspect ratio
+                fit: BoxFit.cover,
                 child: SizedBox(
                   width: _controller!.value.previewSize!.height,
                   height: _controller!.value.previewSize!.width,
-                  child: AspectRatio(
-                    aspectRatio: _controller!.value.aspectRatio,
-                    child: CameraPreview(_controller!),
+                  child: Transform(
+                    alignment: Alignment.center,
+                    transform: Matrix4.identity()
+                      ..scale(_isRearCamera ? 1.0 : -1.0, 1.0, 1.0), // Flip horizontally for front camera
+                    child: AspectRatio(
+                      aspectRatio: _controller!.value.aspectRatio,
+                      child: CameraPreview(_controller!),
+                    ),
                   ),
                 ),
               ),
@@ -288,9 +403,9 @@ class _PhotoJournalPageState extends State<PhotoJournalPage> {
                           color: Colors.green[100],
                           borderRadius: BorderRadius.circular(20),
                         ),
-                        child: const Text(
-                          'Today MOOD: HAPPY',
-                          style: TextStyle(
+                        child: Text(
+                          'Detected Mood: $_selectedMood',
+                          style: const TextStyle(
                             fontSize: 14,
                             color: Colors.green,
                             fontWeight: FontWeight.w500,
@@ -329,7 +444,7 @@ class _PhotoJournalPageState extends State<PhotoJournalPage> {
                     child: const Icon(Icons.camera, color: Colors.black),
                     tooltip: 'Take Photo',
                   ),
-                  const SizedBox(width: 48), // Placeholder for symmetry
+                  const SizedBox(width: 48),
                 ],
               ),
             ),

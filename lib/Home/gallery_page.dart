@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:cached_network_image/cached_network_image.dart'; // Add to pubspec.yaml
+import 'package:cached_network_image/cached_network_image.dart';
 import 'home_page.dart';
 
 class GalleryPage extends StatefulWidget {
@@ -11,7 +11,7 @@ class GalleryPage extends StatefulWidget {
 }
 
 class _GalleryPageState extends State<GalleryPage> {
-  List<String> _photoUrls = [];
+  List<Map<String, dynamic>> _photoEntries = []; // Store photo URL and mood
   bool _isLoading = true;
   String? _errorMessage;
 
@@ -30,17 +30,21 @@ class _GalleryPageState extends State<GalleryPage> {
       if (user != null) {
         final response = await supabase
             .from('photo_entries')
-            .select('photo_url')
+            .select('photo_url, mood, id') // Include id for deletion
             .eq('user_id', user.id)
             .order('timestamp', ascending: false)
             .timeout(const Duration(seconds: 10));
         print('Photo query response: $response');
         setState(() {
-          _photoUrls = (response as List)
-              .map((item) => item['photo_url'] as String)
-              .where((url) => url.isNotEmpty)
+          _photoEntries = (response as List)
+              .map((item) => {
+            'id': item['id'] as String,
+            'photo_url': item['photo_url'] as String,
+            'mood': item['mood'] as String,
+          })
+              .where((entry) => (entry['photo_url'] as String?)?.isNotEmpty ?? false)
               .toList();
-          print('Loaded photo URLs: $_photoUrls');
+          print('Loaded photo entries: $_photoEntries');
           _isLoading = false;
         });
       } else {
@@ -58,6 +62,24 @@ class _GalleryPageState extends State<GalleryPage> {
       await Future.delayed(const Duration(seconds: 2));
       await _loadPhotos();
       setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _deletePhoto(String id, String photoUrl) async {
+    try {
+      final supabase = Supabase.instance.client;
+      final fileName = photoUrl.split('/').last; // Extract file name from URL
+      await supabase.storage.from('photos').remove([fileName]); // Delete from storage
+      await supabase.from('photo_entries').delete().eq('id', id); // Delete from table
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Photo deleted successfully')),
+      );
+      await _loadPhotos(); // Refresh the gallery
+    } catch (e) {
+      print('Error deleting photo: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error deleting photo: $e')),
+      );
     }
   }
 
@@ -98,7 +120,7 @@ class _GalleryPageState extends State<GalleryPage> {
           textAlign: TextAlign.center,
         ),
       )
-          : _photoUrls.isEmpty
+          : _photoEntries.isEmpty
           ? const Center(
         child: Text(
           'No photos yet. Start capturing your moments!',
@@ -112,25 +134,60 @@ class _GalleryPageState extends State<GalleryPage> {
           crossAxisSpacing: 10,
           mainAxisSpacing: 10,
         ),
-        itemCount: _photoUrls.length,
+        itemCount: _photoEntries.length,
         itemBuilder: (context, index) {
-          print('Loading image at index $index: ${_photoUrls[index]}');
+          final entry = _photoEntries[index];
+          print('Loading image at index $index: ${entry['photo_url']}');
           return Card(
             elevation: 4,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
             ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(15),
-              child: CachedNetworkImage(
-                imageUrl: _photoUrls[index],
-                fit: BoxFit.cover,
-                placeholder: (context, url) => const Center(child: CircularProgressIndicator()),
-                errorWidget: (context, url, error) {
-                  print('Image load error at index $index: $error');
-                  return const Center(child: Icon(Icons.error));
-                },
-              ),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: ClipRRect(
+                        borderRadius: const BorderRadius.vertical(top: Radius.circular(15)),
+                        child: CachedNetworkImage(
+                          imageUrl: entry['photo_url'],
+                          fit: BoxFit.cover,
+                          placeholder: (context, url) => const Center(child: CircularProgressIndicator()),
+                          errorWidget: (context, url, error) {
+                            print('Image load error at index $index: $error');
+                            return const Center(child: Icon(Icons.error));
+                          },
+                        ),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      color: Colors.black.withOpacity(0.7),
+                      child: Text(
+                        'Mood: ${entry['mood']}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ],
+                ),
+                Positioned(
+                  top: 5,
+                  right: 5,
+                  child: IconButton(
+                    icon: const Icon(Icons.delete, color: Colors.red),
+                    onPressed: () => _deletePhoto(entry['id'], entry['photo_url']),
+                    tooltip: 'Delete Photo',
+                  ),
+                ),
+              ],
             ),
           );
         },

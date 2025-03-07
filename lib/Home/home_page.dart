@@ -287,47 +287,21 @@ class _HomePageState extends State<HomePage> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              IconButton(icon: const Icon(Icons.calendar_today), onPressed: () {}),
+
               Padding(
                 padding: EdgeInsets.only(
                   right: MediaQuery.of(context).size.width * 0.37,
                   top: MediaQuery.of(context).size.height * 0.01,
                 ),
-                child: Text(
-                  DateFormat('EEE, d MMM yyyy').format(DateTime.now()),
-                  style: const TextStyle(fontSize: 14, color: Colors.grey),
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 20.0),
+                  child: Text(
+                    DateFormat('EEE, d MMM yyyy').format(DateTime.now()),
+                    style: const TextStyle(fontSize: 14, color: Colors.grey),
+                  ),
                 ),
               ),
-              IconButton(
-                icon: Stack(
-                  children: [
-                    const Icon(Icons.notifications, size: 30),
-                    if (notifications > 0)
-                      Positioned(
-                        right: 0,
-                        top: 0,
-                        child: Container(
-                          padding: const EdgeInsets.all(2),
-                          decoration: const BoxDecoration(
-                            color: Colors.red,
-                            shape: BoxShape.circle,
-                          ),
-                          constraints: const BoxConstraints(minWidth: 14, minHeight: 14),
-                          child: Text(
-                            '$notifications',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 8,
-                              height: 1,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-                onPressed: () {},
-              ),
+
             ],
           ),
           SizedBox(height: MediaQuery.of(context).size.height * 0.02),
@@ -531,20 +505,7 @@ class _HomePageState extends State<HomePage> {
                 MaterialPageRoute(builder: (context) => const JournalPage()),
               ),
             ),
-            _buildTrackerButton(
-              icon: Icons.mood,
-              title: 'Mood Tracker',
-              value: 'SAD → NEUTRAL → HAPPY',
-              color: Colors.pink,
-              orientation: orientation,
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const MoodPage(),
-                  settings: const RouteSettings(arguments: {'fromTracker': true}),
-                ),
-              ),
-            ),
+
           ],
         ),
       ),
@@ -673,11 +634,11 @@ class _HomePageState extends State<HomePage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Padding(
-                padding: const EdgeInsets.only(top: 8.0, left: 8.0),
+                padding: const EdgeInsets.only(top: 12.0, ),
                 child: Text(
                   'Health Journal',
                   style: TextStyle(
-                    fontSize: orientation == Orientation.portrait ? 16 : 12,
+                    fontSize: orientation == Orientation.portrait ? 15 : 12,
                     color: textColor,
                     fontWeight: FontWeight.bold,
                   ),

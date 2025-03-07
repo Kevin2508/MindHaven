@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:intl/intl.dart';
 import 'dart:io';
 
 class ProfilePage extends StatefulWidget {
@@ -13,18 +14,28 @@ class ProfilePage extends StatefulWidget {
 class _ProfilePageState extends State<ProfilePage> {
   String? userName = 'User';
   String? profileImageUrl = 'https://via.placeholder.com/128';
+  String? userEmail;
+  String? phoneNumber;
   int? userAge;
+  String? bio; // New bio variable
+  String? joinedDate;
+  int streakCount = 0;
   bool _isLoading = true;
   File? _newProfileImage;
   List<Map<String, dynamic>> _userPosts = [];
 
   final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _ageController = TextEditingController();
+  final TextEditingController _bioController = TextEditingController(); // New bio controller
 
   @override
   void initState() {
     super.initState();
     _loadUserData();
     _fetchUserPosts();
+    _calculateStreak();
   }
 
   Future<void> _loadUserData() async {
@@ -35,7 +46,7 @@ class _ProfilePageState extends State<ProfilePage> {
       try {
         final response = await supabase
             .from('profiles')
-            .select('full_name, avatar_url, age')
+            .select('full_name, avatar_url, age, phone_number, bio') // Added bio
             .eq('id', user.id)
             .single();
 
@@ -43,8 +54,18 @@ class _ProfilePageState extends State<ProfilePage> {
           setState(() {
             userName = response['full_name'] ?? user.email?.split('@')[0] ?? 'User';
             profileImageUrl = response['avatar_url'] ?? 'https://via.placeholder.com/128';
+            userEmail = user.email;
+            phoneNumber = response['phone_number'] as String?;
             userAge = response['age'] as int?;
+            bio = response['bio'] as String?; // Fetch bio
+            joinedDate = user.createdAt != null
+                ? DateFormat('MMM d, yyyy').format(DateTime.parse(user.createdAt!))
+                : 'Unknown';
             _nameController.text = userName ?? '';
+            _emailController.text = userEmail ?? '';
+            _phoneController.text = phoneNumber ?? '';
+            _ageController.text = userAge?.toString() ?? '';
+            _bioController.text = bio ?? ''; // Initialize bio controller
             _isLoading = false;
           });
         }
@@ -66,6 +87,32 @@ class _ProfilePageState extends State<ProfilePage> {
           _isLoading = false;
           profileImageUrl = 'https://via.placeholder.com/128';
         });
+      }
+    }
+  }
+
+  Future<void> _calculateStreak() async {
+    final supabase = Supabase.instance.client;
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
+
+    try {
+      final history = await supabase
+          .from('mental_score_history')
+          .select('date')
+          .eq('user_id', user.id);
+
+      final uniqueDays = (history as List)
+          .map((entry) => entry['date'] as String)
+          .toSet()
+          .length;
+
+      if (mounted) {
+        setState(() => streakCount = uniqueDays);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => streakCount = 0);
       }
     }
   }
@@ -110,9 +157,28 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Future<void> _updateProfile() async {
-    if (_nameController.text.trim().isEmpty) {
+    final name = _nameController.text.trim();
+    final email = _emailController.text.trim();
+    final phone = _phoneController.text.trim();
+    final age = _ageController.text.trim();
+    final bioText = _bioController.text.trim();
+
+    if (name.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Name cannot be empty')),
+      );
+      return;
+    }
+    if (email.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Email cannot be empty')),
+      );
+      return;
+    }
+    // Check bio word count
+    if (bioText.split(RegExp(r'\s+')).length > 20) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Bio must be 20 words or fewer')),
       );
       return;
     }
@@ -130,6 +196,10 @@ class _ProfilePageState extends State<ProfilePage> {
         return;
       }
 
+      if (email != user.email) {
+        await supabase.auth.updateUser(UserAttributes(email: email));
+      }
+
       final existingProfile = await supabase
           .from('profiles')
           .select('id')
@@ -137,7 +207,10 @@ class _ProfilePageState extends State<ProfilePage> {
           .maybeSingle();
 
       Map<String, dynamic> updates = {
-        'full_name': _nameController.text.trim(),
+        'full_name': name,
+        'phone_number': phone.isEmpty ? null : phone,
+        'age': age.isEmpty ? null : int.tryParse(age),
+        'bio': bioText.isEmpty ? null : bioText, // Save bio
       };
 
       String? newImageUrl;
@@ -166,7 +239,11 @@ class _ProfilePageState extends State<ProfilePage> {
 
       if (mounted) {
         setState(() {
-          userName = _nameController.text.trim();
+          userName = name;
+          userEmail = email;
+          phoneNumber = phone.isEmpty ? null : phone;
+          userAge = age.isEmpty ? null : int.tryParse(age);
+          bio = bioText.isEmpty ? null : bioText; // Update bio in state
           if (_newProfileImage != null) {
             profileImageUrl = newImageUrl ?? profileImageUrl;
           }
@@ -189,6 +266,86 @@ class _ProfilePageState extends State<ProfilePage> {
         setState(() => _isLoading = false);
       }
     }
+  }
+
+  Future<void> _deletePost(String postId) async {
+    final supabase = Supabase.instance.client;
+    try {
+      await supabase.from('community_posts').delete().eq('id', postId);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Post deleted successfully!')),
+        );
+        _fetchUserPosts();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error deleting post: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _updatePost(String postId, String currentCaption) async {
+    final TextEditingController captionController = TextEditingController(text: currentCaption);
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Edit Post'),
+          content: TextField(
+            controller: captionController,
+            decoration: const InputDecoration(
+              hintText: 'Enter new caption',
+              border: OutlineInputBorder(),
+            ),
+            maxLines: 3,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+            ),
+            TextButton(
+              onPressed: () async {
+                final newCaption = captionController.text.trim();
+                if (newCaption.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Caption cannot be empty')),
+                  );
+                  return;
+                }
+
+                try {
+                  final supabase = Supabase.instance.client;
+                  await supabase
+                      .from('community_posts')
+                      .update({'caption': newCaption})
+                      .eq('id', postId);
+
+                  if (mounted) {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Post updated successfully!')),
+                    );
+                    _fetchUserPosts();
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Error updating post: $e')),
+                    );
+                  }
+                }
+              },
+              child: const Text('Update', style: TextStyle(color: Colors.blue)),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Future<void> _logout() async {
@@ -240,51 +397,136 @@ class _ProfilePageState extends State<ProfilePage> {
           title: const Text('Edit Profile'),
           content: SingleChildScrollView(
             child: Column(
-            mainAxisSize: MainAxisSize.min,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                GestureDetector(
+                  onTap: _isLoading ? null : _pickImage,
+                  child: CircleAvatar(
+                    radius: 50,
+                    backgroundImage: _newProfileImage != null
+                        ? FileImage(_newProfileImage!) as ImageProvider
+                        : NetworkImage(profileImageUrl!),
+                    child: _newProfileImage == null && !_isLoading
+                        ? const Icon(Icons.edit, color: Colors.grey)
+                        : null,
+                  ),
+                ),
+                SizedBox(height: MediaQuery.of(context).size.height * 0.02),
+                TextField(
+                  controller: _nameController,
+                  decoration: const InputDecoration(
+                    hintText: 'Enter your name',
+                    border: OutlineInputBorder(),
+                    labelText: 'Name',
+                  ),
+                  maxLines: 1,
+                  enabled: !_isLoading,
+                ),
+                SizedBox(height: MediaQuery.of(context).size.height * 0.02),
+                TextField(
+                  controller: _emailController,
+                  decoration: const InputDecoration(
+                    hintText: 'Enter your email',
+                    border: OutlineInputBorder(),
+                    labelText: 'Email',
+                  ),
+                  keyboardType: TextInputType.emailAddress,
+                  maxLines: 1,
+                  enabled: !_isLoading,
+                ),
+                SizedBox(height: MediaQuery.of(context).size.height * 0.02),
+                TextField(
+                  controller: _phoneController,
+                  decoration: const InputDecoration(
+                    hintText: 'Enter your phone number',
+                    border: OutlineInputBorder(),
+                    labelText: 'Phone Number',
+                  ),
+                  keyboardType: TextInputType.phone,
+                  maxLines: 1,
+                  enabled: !_isLoading,
+                ),
+                SizedBox(height: MediaQuery.of(context).size.height * 0.02),
+                TextField(
+                  controller: _ageController,
+                  decoration: const InputDecoration(
+                    hintText: 'Enter your age',
+                    border: OutlineInputBorder(),
+                    labelText: 'Age',
+                  ),
+                  keyboardType: TextInputType.number,
+                  maxLines: 1,
+                  enabled: !_isLoading,
+                ),
+                SizedBox(height: MediaQuery.of(context).size.height * 0.02),
+                TextField(
+                  controller: _bioController,
+                  decoration: const InputDecoration(
+                    hintText: 'Enter your bio (max 20 words)',
+                    border: OutlineInputBorder(),
+                    labelText: 'Bio',
+                  ),
+                  maxLines: 2,
+                  enabled: !_isLoading,
+                  onChanged: (value) {
+                    final wordCount = value.trim().split(RegExp(r'\s+')).length;
+                    if (wordCount > 20) {
+                      _bioController.text = value.split(' ').take(20).join(' ');
+                      _bioController.selection = TextSelection.fromPosition(
+                        TextPosition(offset: _bioController.text.length),
+                      );
+                    }
+                  },
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: _isLoading
+                  ? null
+                  : () {
+                setState(() => _newProfileImage = null);
+                Navigator.pop(context);
+              },
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: _isLoading ? null : _updateProfile,
+              child: const Text('Update'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildProfileDetail(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        children: [
+          Icon(icon, color: const Color(0xFF926247), size: 24),
+          const SizedBox(width: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              GestureDetector(
-                onTap: _isLoading ? null : _pickImage,
-                child: CircleAvatar(
-                  radius: 50,
-                  backgroundImage: _newProfileImage != null
-                      ? FileImage(_newProfileImage!) as ImageProvider
-                      : NetworkImage(profileImageUrl!),
-                  child: _newProfileImage == null && !_isLoading
-                      ? const Icon(Icons.edit, color: Colors.grey)
-                      : null,
-                ),
+              Text(
+                label,
+                style: const TextStyle(fontSize: 14, color: Colors.grey),
               ),
-              SizedBox(height: MediaQuery.of(context).size.height * 0.02),
-              TextField(
-                controller: _nameController,
-                decoration: const InputDecoration(
-                  hintText: 'Enter your name',
-                  border: OutlineInputBorder(),
-                  labelText: 'Name',
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 16,
+                  color: Color(0xFF2E4A2E),
+                  fontWeight: FontWeight.w500,
                 ),
-                maxLines: 1,
-                enabled: !_isLoading,
               ),
             ],
           ),
-        ),
-        actions: [
-        TextButton(
-        onPressed: _isLoading
-        ? null
-            : () {
-        setState(() => _newProfileImage = null);
-        Navigator.pop(context);
-        },
-        child: const Text('Cancel'),
-        ),
-        TextButton(
-        onPressed: _isLoading ? null : _updateProfile,
-        child: const Text('Update'),
-        ),
         ],
-        );
-        },
+      ),
     );
   }
 
@@ -312,7 +554,6 @@ class _ProfilePageState extends State<ProfilePage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // Large adjustable profile picture
                 Container(
                   width: double.infinity,
                   height: MediaQuery.of(context).size.height * 0.3,
@@ -351,17 +592,44 @@ class _ProfilePageState extends State<ProfilePage> {
                     color: Color(0xFF2E4A2E),
                   ),
                 ),
-                if (userAge != null)
-                  Padding(
-                    padding: EdgeInsets.only(top: MediaQuery.of(context).size.height * 0.01),
-                    child: Text(
-                      'Age: $userAge',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        color: Colors.grey,
-                      ),
+                if (bio != null && bio!.isNotEmpty) ...[
+                  SizedBox(height: MediaQuery.of(context).size.height * 0.01),
+                  Text(
+                    bio!,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      color: Colors.grey,
+                      fontStyle: FontStyle.italic,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+                SizedBox(height: MediaQuery.of(context).size.height * 0.02),
+                Card(
+                  elevation: 2,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (userEmail != null)
+                          _buildProfileDetail(Icons.email, 'Email', userEmail!),
+                        if (phoneNumber != null)
+                          _buildProfileDetail(Icons.phone, 'Phone', phoneNumber!),
+                        if (userAge != null)
+                          _buildProfileDetail(Icons.cake, 'Age', '$userAge'),
+                        if (joinedDate != null)
+                          _buildProfileDetail(Icons.calendar_today, 'Joined', joinedDate!),
+                        _buildProfileDetail(
+                          Icons.local_fire_department,
+                          'Streak',
+                          '$streakCount Days',
+                        ),
+                      ],
                     ),
                   ),
+                ),
                 SizedBox(height: MediaQuery.of(context).size.height * 0.02),
                 ElevatedButton(
                   onPressed: _showEditProfileDialog,
@@ -382,10 +650,9 @@ class _ProfilePageState extends State<ProfilePage> {
                   ),
                 ),
                 SizedBox(height: MediaQuery.of(context).size.height * 0.02),
-                // User's Community Posts
                 Text(
                   "My Community Posts",
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
                     color: Color(0xFF2E4A2E),
@@ -407,14 +674,14 @@ class _ProfilePageState extends State<ProfilePage> {
                   itemBuilder: (context, index) {
                     final post = _userPosts[index];
                     return Card(
-                      margin: EdgeInsets.only(bottom: 8.0),
+                      margin: const EdgeInsets.only(bottom: 8.0),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                       elevation: 2,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           ClipRRect(
-                            borderRadius: BorderRadius.vertical(top: Radius.circular(15)),
+                            borderRadius: const BorderRadius.vertical(top: Radius.circular(15)),
                             child: Image.network(
                               post['image_url'],
                               width: double.infinity,
@@ -429,9 +696,49 @@ class _ProfilePageState extends State<ProfilePage> {
                           ),
                           Padding(
                             padding: const EdgeInsets.all(12.0),
-                            child: Text(
-                              post['caption'] ?? '',
-                              style: const TextStyle(fontSize: 16, color: Colors.black87),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  post['caption'] ?? '',
+                                  style: const TextStyle(fontSize: 16, color: Colors.black87),
+                                ),
+                                const SizedBox(height: 8),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.end,
+                                  children: [
+                                    IconButton(
+                                      icon: const Icon(Icons.edit, color: Colors.blue),
+                                      onPressed: () => _updatePost(post['id'], post['caption'] ?? ''),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.delete, color: Colors.red),
+                                      onPressed: () {
+                                        showDialog(
+                                          context: context,
+                                          builder: (context) => AlertDialog(
+                                            title: const Text('Delete Post'),
+                                            content: const Text('Are you sure you want to delete this post?'),
+                                            actions: [
+                                              TextButton(
+                                                onPressed: () => Navigator.pop(context),
+                                                child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+                                              ),
+                                              TextButton(
+                                                onPressed: () {
+                                                  Navigator.pop(context);
+                                                  _deletePost(post['id']);
+                                                },
+                                                child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              ],
                             ),
                           ),
                         ],
@@ -440,7 +747,6 @@ class _ProfilePageState extends State<ProfilePage> {
                   },
                 ),
                 SizedBox(height: MediaQuery.of(context).size.height * 0.02),
-                // Logout Button
                 ElevatedButton(
                   onPressed: _logout,
                   style: ElevatedButton.styleFrom(
@@ -465,5 +771,15 @@ class _ProfilePageState extends State<ProfilePage> {
         ),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    _phoneController.dispose();
+    _ageController.dispose();
+    _bioController.dispose(); // Dispose bio controller
+    super.dispose();
   }
 }

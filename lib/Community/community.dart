@@ -7,7 +7,6 @@ import 'package:flutter_animate/flutter_animate.dart';
 
 class CommunityPage extends StatefulWidget {
   final String? theme;
-
   const CommunityPage({super.key, this.theme});
 
   @override
@@ -23,6 +22,10 @@ class _CommunityPageState extends State<CommunityPage> {
   List<Map<String, dynamic>> _posts = [];
   bool _isLoading = true;
   List<String> _uniqueHashtags = [];
+  String _currentSort = 'upvotes';
+  bool _isSortAscending = false;
+
+  final supabase = Supabase.instance.client;
 
   @override
   void initState() {
@@ -31,224 +34,124 @@ class _CommunityPageState extends State<CommunityPage> {
     _fetchPosts();
   }
 
-  Future<void> _pickImage() async {
-    final ImagePicker picker = ImagePicker();
-    final XFile? image = await picker.pickImage(source: ImageSource.gallery);
-
-    if (image != null) {
-      showDialog(
-        context: context,
-        builder: (BuildContext context) {
-          return AlertDialog(
-            backgroundColor: Color(0xfff4eee0),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            title: Text(
-              'Create Post',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Color(0xff5e3e2b),
-              ),
-            ),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Image.file(
-                      File(image.path),
-                      height: 200,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                  SizedBox(height: 16),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black12,
-                          blurRadius: 6,
-                          offset: Offset(0, 3),
-                        ),
-                      ],
-                    ),
-                    child: TextField(
-                      controller: _captionController,
-                      decoration: InputDecoration(
-                        hintText: 'Write a caption...',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide.none,
-                        ),
-                        contentPadding: EdgeInsets.all(16),
-                        fillColor: Colors.white,
-                        filled: true,
-                      ),
-                      maxLines: 3,
-                      onChanged: (value) => _caption = value,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: Text('Cancel', style: TextStyle(color: Color(0xff5e3e2b))),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  setState(() {
-                    _selectedImage = File(image.path);
-                  });
-                  _uploadPost();
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Color(0xff5e3e2b),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-                child: Text('Post', style: TextStyle(color: Colors.white)),
-              ),
-            ],
-          );
-        },
-      );
-    }
-  }
-
-  Future _loadUserData() async {
-    final supabase = Supabase.instance.client;
+  Future<void> _loadUserData() async {
     final user = supabase.auth.currentUser;
-    if (user != null) {
+    if (user == null) return;
+
+    try {
       final response = await supabase
           .from('profiles')
           .select('full_name, avatar_url')
           .eq('id', user.id)
-          .single()
-          .catchError((e) {
-        print('Error fetching profile: $e');
-        return null;
-      });
+          .single();
 
       setState(() {
-        userName = response?['full_name']?.split(' ')?.first ?? user.email?.split('@')[0] ?? 'User';
-        profileImageUrl = response?['avatar_url'] ?? 'https://via.placeholder.com/64';
+        userName = response['full_name']?.split(' ')?.first ?? user.email?.split('@')[0] ?? 'User';
+        profileImageUrl = response['avatar_url'] ?? 'https://via.placeholder.com/64';
       });
+    } catch (e) {
+      print('Error fetching profile: $e');
     }
   }
 
-  Future _fetchPosts() async {
+  Future<void> _fetchPosts() async {
     setState(() => _isLoading = true);
     try {
-      final supabase = Supabase.instance.client;
-      final user = supabase.auth.currentUser;
-
       final response = await supabase
           .from('community_posts')
-          .select('id, user_id, image_url, caption, upvotes, downvotes, created_at')
-          .order('upvotes', ascending: false);
+          .select('id, user_id, image_url, caption, upvotes, downvotes, created_at');
 
       Set<String> uniqueHashtags = {};
+      final user = supabase.auth.currentUser;
 
-      final postsWithVotes = await Future.wait(response.map((post) async {
-        String createdAt = post['created_at']?.toString() ?? DateTime.now().toIso8601String();
-        String? userVote;
-
-        if (user != null) {
-          final voteResponse = await supabase
-              .from('user_votes')
-              .select('vote_type')
-              .eq('user_id', user.id)
-              .eq('post_id', post['id'])
-              .maybeSingle();
-          userVote = voteResponse?['vote_type'] as String?;
-        }
-
-        List<String> hashtags = _extractHashtags(post['caption'] ?? '');
-        hashtags.forEach((hashtag) => uniqueHashtags.add(hashtag.toLowerCase()));
-
-        return {
-          'id': post['id'],
-          'user_id': post['user_id'],
-          'image_url': post['image_url'],
-          'caption': post['caption'] ?? '',
-          'upvotes': (post['upvotes'] ?? 0) as int,
-          'downvotes': (post['downvotes'] ?? 0) as int,
-          'created_at': createdAt,
-          'userVote': userVote,
-          'hashtags': hashtags,
-        };
-      }));
+      final posts = await Future.wait(response.map((post) async => await _processPost(post, user, uniqueHashtags)));
 
       setState(() {
-        _posts = postsWithVotes;
+        _posts = _sortPosts(posts.toList());
         _uniqueHashtags = uniqueHashtags.toList();
         _isLoading = false;
       });
     } catch (e) {
-      print('Error fetching posts: $e');
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error fetching posts: $e')));
-      setState(() => _isLoading = false);
+      _handleError('Error fetching posts: $e');
     }
   }
 
-  List<String> _extractHashtags(String caption) {
-    List<String> hashtags = [];
-    RegExp regExp = RegExp(r'#\w+');
-    Iterable<Match> matches = regExp.allMatches(caption);
-    for (Match match in matches) {
-      hashtags.add(match.group(0)!);
+  Future<Map<String, dynamic>> _processPost(dynamic post, User? user, Set<String> uniqueHashtags) async {
+    String? userVote;
+    if (user != null) {
+      userVote = await supabase
+          .from('user_votes')
+          .select('vote_type')
+          .eq('user_id', user.id)
+          .eq('post_id', post['id'])
+          .maybeSingle()
+          .then((vote) => vote?['vote_type'] as String?);
     }
-    return hashtags;
+
+    final hashtags = _extractHashtags(post['caption'] ?? '');
+    hashtags.forEach((hashtag) => uniqueHashtags.add(hashtag.toLowerCase()));
+
+    return {
+      'id': post['id'],
+      'user_id': post['user_id'],
+      'image_url': post['image_url'],
+      'caption': post['caption'] ?? '',
+      'upvotes': post['upvotes'] ?? 0,
+      'downvotes': post['downvotes'] ?? 0,
+      'created_at': post['created_at'] ?? DateTime.now().toIso8601String(),
+      'userVote': userVote,
+      'hashtags': hashtags,
+    };
   }
 
-  Future<String?> _getUserName(String userId) async {
-    try {
-      final supabase = Supabase.instance.client;
-      final response = await supabase.from('profiles').select('full_name').eq('id', userId).single();
-      return response['full_name'] ?? 'Anonymous';
-    } catch (e) {
-      return 'Anonymous';
-    }
+  List<String> _extractHashtags(String caption) => RegExp(r'#\w+')
+      .allMatches(caption)
+      .map((match) => match.group(0)!)
+      .toList();
+
+  List<Map<String, dynamic>> _sortPosts(List<Map<String, dynamic>> posts) {
+    posts.sort((a, b) {
+      int comparison;
+      switch (_currentSort) {
+        case 'upvotes':
+          comparison = a['upvotes'].compareTo(b['upvotes']);
+          break;
+        case 'downvotes':
+          comparison = a['downvotes'].compareTo(b['downvotes']);
+          break;
+        case 'latest':
+        case 'oldest':
+          comparison = DateTime.parse(a['created_at']).compareTo(DateTime.parse(b['created_at']));
+          comparison = _currentSort == 'oldest' ? -comparison : comparison;
+          break;
+        default:
+          comparison = 0;
+      }
+      return _isSortAscending ? comparison : -comparison;
+    });
+    return posts;
   }
 
-  Future<String?> _getUserProfileImage(String userId) async {
-    try {
-      final supabase = Supabase.instance.client;
-      final response = await supabase.from('profiles').select('avatar_url').eq('id', userId).single();
-      return response['avatar_url'] ?? 'https://via.placeholder.com/64';
-    } catch (e) {
-      return 'https://via.placeholder.com/64';
-    }
+  Future<void> _pickImage() async {
+    final image = await ImagePicker().pickImage(source: ImageSource.gallery);
+    if (image == null) return;
+
+    if (!mounted) return;
+    _showPostDialog(image: File(image.path), isUpdate: false);
   }
 
   Future<void> _uploadPost() async {
     if (_selectedImage == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select an image')));
+      _showSnackBar('Please select an image');
       return;
     }
 
+    final user = _authenticatedUserCheck();
+    if (user == null) return;
+
     try {
-      final supabase = Supabase.instance.client;
-      final user = supabase.auth.currentUser;
-      if (user == null) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please log in to post')));
-        return;
-      }
-
       final fileName = '${DateTime.now().toIso8601String()}_${user.id}.jpg';
-      final bytes = await _selectedImage!.readAsBytes();
-      await supabase.storage.from('community_images').uploadBinary(
-        fileName,
-        bytes,
-        fileOptions: const FileOptions(contentType: 'image/jpeg'),
-      );
-
-      final imageUrl = supabase.storage.from('community_images').getPublicUrl(fileName);
+      final imageUrl = await _uploadImage(fileName);
 
       await supabase.from('community_posts').insert({
         'user_id': user.id,
@@ -258,242 +161,272 @@ class _CommunityPageState extends State<CommunityPage> {
         'downvotes': 0,
       });
 
-      setState(() {
-        _selectedImage = null;
-        _caption = '';
-        _captionController.clear();
-      });
-
+      _resetPostForm();
+      if (!mounted) return;
       Navigator.pop(context);
-      await _fetchPosts();
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Post uploaded successfully!')));
+      _fetchPosts();
+      _showSnackBar('Post uploaded successfully!');
     } catch (e) {
-      print('Error uploading post: $e');
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error uploading post: $e')));
+      _handleError('Error uploading post: $e');
     }
+  }
+
+  Future<String> _uploadImage(String fileName) async {
+    final bytes = await _selectedImage!.readAsBytes();
+    await supabase.storage.from('community_images').uploadBinary(
+      fileName,
+      bytes,
+      fileOptions: const FileOptions(contentType: 'image/jpeg'),
+    );
+    return supabase.storage.from('community_images').getPublicUrl(fileName);
   }
 
   Future<void> _votePost(String postId, bool isUpvote) async {
+    final user = _authenticatedUserCheck();
+    if (user == null) return;
+
+    final postIdNum = int.tryParse(postId) ?? 0;
+    if (postIdNum == 0) return;
+
     try {
-      final supabase = Supabase.instance.client;
-      final user = supabase.auth.currentUser;
-      if (user == null) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please log in to vote.')));
-        return;
-      }
+      final postIndex = _posts.indexWhere((p) => p['id'].toString() == postId);
+      if (postIndex == -1) return;
 
-      final postIdNum = int.tryParse(postId) ?? 0;
-      if (postIdNum == 0) return;
+      final voteData = await _getVoteData(user.id, postIdNum);
+      final updatedPost = await _updateVote(postIdNum, isUpvote, voteData, Map.from(_posts[postIndex]));
 
-      final existingVote = await supabase
-          .from('user_votes')
-          .select('vote_type')
-          .eq('user_id', user.id)
-          .eq('post_id', postIdNum)
-          .single()
-          .then((value) => value as Map<String, dynamic>?)
-          .catchError((e) => null);
-
-      final postResponse = await supabase
-          .from('community_posts')
-          .select('upvotes, downvotes')
-          .eq('id', postIdNum)
-          .single()
-          .catchError((e) => null) as Map<String, dynamic>?;
-
-      if (postResponse == null) return;
-
-      int currentUpvotes = postResponse['upvotes'] as int? ?? 0;
-      int currentDownvotes = postResponse['downvotes'] as int? ?? 0;
-
-      if (existingVote != null) {
-        String? currentVoteType = existingVote['vote_type'] as String?;
-        if (currentVoteType == 'upvote' && !isUpvote) {
-          currentUpvotes -= 1;
-          currentDownvotes += 1;
-          await supabase.from('user_votes').update({'vote_type': 'downvote'}).eq('user_id', user.id).eq('post_id', postIdNum);
-          await supabase.from('community_posts').update({'upvotes': currentUpvotes, 'downvotes': currentDownvotes}).eq('id', postIdNum);
-        } else if (currentVoteType == 'downvote' && isUpvote) {
-          currentUpvotes += 1;
-          currentDownvotes -= 1;
-          await supabase.from('user_votes').update({'vote_type': 'upvote'}).eq('user_id', user.id).eq('post_id', postIdNum);
-          await supabase.from('community_posts').update({'upvotes': currentUpvotes, 'downvotes': currentDownvotes}).eq('id', postIdNum);
-        } else {
-          return;
-        }
-      } else {
-        if (isUpvote) {
-          currentUpvotes += 1;
-          await supabase.from('user_votes').insert({'user_id': user.id, 'post_id': postIdNum, 'vote_type': 'upvote'});
-          await supabase.from('community_posts').update({'upvotes': currentUpvotes}).eq('id', postIdNum);
-        } else {
-          currentDownvotes += 1;
-          await supabase.from('user_votes').insert({'user_id': user.id, 'post_id': postIdNum, 'vote_type': 'downvote'});
-          await supabase.from('community_posts').update({'downvotes': currentDownvotes}).eq('id', postIdNum);
-        }
-      }
-
-      await _fetchPosts();
+      setState(() {
+        _posts[postIndex] = updatedPost;
+        _posts = _sortPosts(_posts);
+      });
     } catch (e) {
-      print('Error voting: $e');
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error voting: $e')));
+      _handleError('Error voting: $e');
     }
   }
 
-  void _showPostOptions(BuildContext context, Map<String, dynamic> post) {
-    showModalBottomSheet(
+  Future<Map<String, dynamic>?> _getVoteData(String userId, int postId) async {
+    return await supabase
+        .from('user_votes')
+        .select('vote_type')
+        .eq('user_id', userId)
+        .eq('post_id', postId)
+        .single()
+        .then((value) => value as Map<String, dynamic>?)
+        .catchError((e) => null);
+  }
+
+  Future<Map<String, dynamic>> _updateVote(int postId, bool isUpvote, Map<String, dynamic>? existingVote, Map<String, dynamic> post) async {
+    int upvotes = post['upvotes'];
+    int downvotes = post['downvotes'];
+    String? newVoteType;
+
+    if (existingVote != null) {
+      final currentVote = existingVote['vote_type'] as String?;
+      if (currentVote == 'upvote' && !isUpvote) {
+        upvotes--;
+        downvotes++;
+        newVoteType = 'downvote';
+      } else if (currentVote == 'downvote' && isUpvote) {
+        upvotes++;
+        downvotes--;
+        newVoteType = 'upvote';
+      }
+      if (newVoteType != null) {
+        await supabase.from('user_votes').update({'vote_type': newVoteType}).eq('user_id', supabase.auth.currentUser!.id).eq('post_id', postId);
+      }
+    } else {
+      if (isUpvote) {
+        upvotes++;
+        newVoteType = 'upvote';
+      } else {
+        downvotes++;
+        newVoteType = 'downvote';
+      }
+      await supabase.from('user_votes').insert({'user_id': supabase.auth.currentUser!.id, 'post_id': postId, 'vote_type': newVoteType});
+    }
+
+    await supabase.from('community_posts').update({'upvotes': upvotes, 'downvotes': downvotes}).eq('id', postId);
+    return {...post, 'upvotes': upvotes, 'downvotes': downvotes, 'userVote': newVoteType};
+  }
+
+  Future<String?> _getUserInfo(String userId, String column) async {
+    try {
+      final response = await supabase.from('profiles').select(column).eq('id', userId).single();
+      return response[column] ?? (column == 'full_name' ? 'Anonymous' : 'https://via.placeholder.com/64');
+    } catch (e) {
+      return column == 'full_name' ? 'Anonymous' : 'https://via.placeholder.com/64';
+    }
+  }
+
+  void _showPostDialog({required File image, required bool isUpdate, Map<String, dynamic>? post}) {
+    if (isUpdate && post != null) _captionController.text = post['caption'] ?? '';
+
+    showDialog(
       context: context,
-      backgroundColor: Color(0xfff4eee0),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (BuildContext sheetContext) {
-        return Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: Icon(Icons.edit, color: Color(0xff5e3e2b)),
-              title: Text('Update', style: TextStyle(color: Color(0xff5e3e2b))),
-              onTap: () {
-                Navigator.pop(sheetContext);
-                _showUpdateCaptionDialog(context, post);
-              },
-            ),
-            ListTile(
-              leading: Icon(Icons.delete, color: Colors.redAccent),
-              title: Text('Delete', style: TextStyle(color: Color(0xff5e3e2b))),
-              onTap: () {
-                Navigator.pop(sheetContext);
-                _deletePost(post);
-              },
-            ),
-          ],
-        );
-      },
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xfff4eee0),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          isUpdate ? 'Update Caption' : 'Create Post',
+          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xff5e3e2b)),
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: isUpdate
+                    ? Image.network(post!['image_url'], height: 200, width: double.infinity, fit: BoxFit.cover)
+                    : Image.file(image, height: 200, width: double.infinity, fit: BoxFit.cover),
+              ),
+              const SizedBox(height: 16),
+              _buildTextField(_captionController, 'Write a caption...'),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel', style: TextStyle(color: Color(0xff5e3e2b))),
+          ),
+          ElevatedButton(
+            onPressed: () => isUpdate ? _updateCaption(post!) : _handleNewPost(image),
+            style: _buttonStyle(),
+            child: Text(isUpdate ? 'Update' : 'Post', style: const TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
     );
   }
 
-  void _showUpdateCaptionDialog(BuildContext context, Map<String, dynamic> post) {
-    final TextEditingController captionController = TextEditingController(text: post['caption'] ?? '');
-    showDialog(
-      context: context,
-      builder: (BuildContext dialogContext) {
-        return AlertDialog(
-          backgroundColor: Color(0xfff4eee0),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Text(
-            'Update Caption',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xff5e3e2b)),
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: Image.network(
-                    post['image_url'],
-                    height: 200,
-                    width: double.infinity,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => Container(
-                      height: 200,
-                      width: double.infinity,
-                      color: Colors.grey[300],
-                      child: Center(child: Text('Image not available')),
-                    ),
-                  ),
-                ),
-                SizedBox(height: 16),
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black12,
-                        blurRadius: 6,
-                        offset: Offset(0, 3),
-                      ),
-                    ],
-                  ),
-                  child: TextField(
-                    controller: captionController,
-                    decoration: InputDecoration(
-                      hintText: 'Enter new caption...',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none,
-                      ),
-                      contentPadding: EdgeInsets.all(16),
-                      fillColor: Colors.white,
-                      filled: true,
-                    ),
-                    maxLines: 3,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: Text('Cancel', style: TextStyle(color: Color(0xff5e3e2b))),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                if (captionController.text.trim().isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Caption cannot be empty')));
-                  return;
-                }
-                try {
-                  final supabase = Supabase.instance.client;
-                  await supabase.from('community_posts').update({'caption': captionController.text.trim()}).eq('id', post['id']);
-                  Navigator.pop(dialogContext);
-                  await _fetchPosts();
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Caption updated successfully!')));
-                } catch (e) {
-                  print('Error updating caption: $e');
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error updating caption: $e')));
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Color(0xff5e3e2b),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-              child: Text('Update', style: TextStyle(color: Colors.white)),
-            ),
-          ],
-        );
-      },
+  Widget _buildTextField(TextEditingController controller, String hint) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 6, offset: Offset(0, 3))],
+      ),
+      child: TextField(
+        controller: controller,
+        decoration: InputDecoration(
+          hintText: hint,
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+          contentPadding: const EdgeInsets.all(16),
+          fillColor: Colors.white,
+          filled: true,
+        ),
+        maxLines: 3,
+        onChanged: (value) => _caption = value,
+      ),
     );
+  }
+
+  ButtonStyle _buttonStyle() => ElevatedButton.styleFrom(
+    backgroundColor: const Color(0xff5e3e2b),
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+  );
+
+  void _handleNewPost(File image) {
+    setState(() => _selectedImage = image);
+    _uploadPost();
+  }
+
+  void _showPostOptions(Map<String, dynamic> post) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xfff4eee0),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (context) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ListTile(
+            leading: const Icon(Icons.edit, color: Color(0xff5e3e2b)),
+            title: const Text('Update', style: TextStyle(color: Color(0xff5e3e2b))),
+            onTap: () {
+              Navigator.pop(context);
+              _showPostDialog(image: File(''), isUpdate: true, post: post);
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.delete, color: Colors.redAccent),
+            title: const Text('Delete', style: TextStyle(color: Color(0xff5e3e2b))),
+            onTap: () {
+              Navigator.pop(context);
+              _deletePost(post);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _updateCaption(Map<String, dynamic> post) async {
+    if (_captionController.text.trim().isEmpty) {
+      _showSnackBar('Caption cannot be empty');
+      return;
+    }
+    try {
+      await supabase.from('community_posts').update({'caption': _captionController.text.trim()}).eq('id', post['id']);
+      if (!mounted) return;
+      Navigator.pop(context);
+      _fetchPosts();
+      _showSnackBar('Caption updated successfully!');
+    } catch (e) {
+      _handleError('Error updating caption: $e');
+    }
   }
 
   Future<void> _deletePost(Map<String, dynamic> post) async {
     try {
-      final supabase = Supabase.instance.client;
       final imageUrl = post['image_url'];
       if (imageUrl != null) {
-        final fileName = imageUrl.split('/').last;
-        await supabase.storage.from('community_images').remove([fileName]);
+        await supabase.storage.from('community_images').remove([imageUrl.split('/').last]);
       }
       await supabase.from('community_posts').delete().eq('id', post['id']);
       await supabase.from('user_votes').delete().eq('post_id', post['id']);
-      await _fetchPosts();
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Post deleted successfully!')));
+      _fetchPosts();
+      _showSnackBar('Post deleted successfully!');
     } catch (e) {
-      print('Error deleting post: $e');
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error deleting post: $e')));
+      _handleError('Error deleting post: $e');
     }
+  }
+
+  User? _authenticatedUserCheck() {
+    final user = supabase.auth.currentUser;
+    if (user == null) _showSnackBar('Please log in to perform this action');
+    return user;
+  }
+
+  void _resetPostForm() {
+    setState(() {
+      _selectedImage = null;
+      _caption = '';
+      _captionController.clear();
+    });
+  }
+
+  void _handleError(String message) {
+    print(message);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    setState(() => _isLoading = false);
+  }
+
+  void _showSnackBar(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
   Widget build(BuildContext context) {
-    List<Map<String, dynamic>> displayedPosts = widget.theme != null
-        ? _posts.where((post) => (post['hashtags'] as List<String>? ?? []).any((hashtag) => hashtag.toLowerCase() == '#${widget.theme!.toLowerCase()}')).toList()
+    final displayedPosts = widget.theme != null
+        ? _posts.where((post) => (post['hashtags'] as List<String>).any((hashtag) => hashtag.toLowerCase() == '#${widget.theme!.toLowerCase()}')).toList()
         : _posts;
 
     return Scaffold(
       body: Container(
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
@@ -503,229 +436,205 @@ class _CommunityPageState extends State<CommunityPage> {
         child: SafeArea(
           child: Column(
             children: [
-              // Header with Back Button
-              Container(
-                padding: EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Color(0xff926247),
-                  boxShadow: [
-                    BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 4)),
-                  ],
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    IconButton(
-                      icon: Icon(Icons.arrow_back_ios_rounded, color: Colors.white, size: 28),
-                      onPressed: () => Navigator.pop(context),
-                      splashRadius: 24,
-                      tooltip: 'Back',
-                    ),
-                    Text(
-                      'Community',
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                        shadows: [Shadow(color: Colors.black38, blurRadius: 4, offset: Offset(2, 2))],
-                      ),
-                    ),
-                    IconButton(
-                      icon: CircleAvatar(
-                        radius: 18,
-                        backgroundColor: Colors.white,
-                        child: Icon(Icons.add, color: Color(0xff5e3e2b), size: 24),
-                      ),
-                      onPressed: _pickImage,
-                      tooltip: 'New Post',
-                    ),
-                  ],
-                ),
-              ),
-              // Hashtags
-              Container(
-                padding: EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Themed Discussion',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xff5e3e2b)),
-                    ),
-                    SizedBox(height: 12),
-                    if (_uniqueHashtags.isNotEmpty)
-                      Wrap(
-                        spacing: 8.0,
-                        runSpacing: 8.0,
-                        children: _uniqueHashtags.asMap().entries.map((entry) {
-                          int index = entry.key;
-                          String hashtag = entry.value;
-                          String buttonText = hashtag.replaceAll('#', '').toUpperCase();
-                          Color buttonColor = [Color(0xff9bb068), Color(0xff6b9b68), Color(0xff689b9b)][index % 3];
-
-                          return ElevatedButton(
-                            onPressed: () {
-                              final currentTheme = widget.theme;
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => CommunityPage(theme: currentTheme == buttonText ? null : buttonText),
-                                ),
-                              );
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: buttonColor,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                              elevation: 4,
-                            ),
-                            child: Text(buttonText, style: TextStyle(color: Colors.white, fontSize: 14)),
-                          ).animate().fadeIn(duration: 300.ms);
-                        }).toList(),
-                      ),
-                  ],
-                ),
-              ),
-              // Posts
-              Expanded(
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-                    boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, -4))],
-                  ),
-                  child: _isLoading
-                      ? Center(child: CircularProgressIndicator(color: Color(0xff5e3e2b)).animate().scale(duration: 400.ms))
-                      : displayedPosts.isEmpty
-                      ? Padding(
-                    padding: EdgeInsets.all(16),
-                    child: Text(
-                      'No posts yet for this theme. Be the first to share!',
-                      style: TextStyle(fontSize: 16, color: Colors.grey[700]),
-                      textAlign: TextAlign.center,
-                    ),
-                  )
-                      : ListView.builder(
-                    padding: EdgeInsets.all(16),
-                    itemCount: displayedPosts.length,
-                    itemBuilder: (context, index) {
-                      final post = displayedPosts[index];
-                      bool isUpvoted = post['userVote'] == 'upvote';
-                      bool isDownvoted = post['userVote'] == 'downvote';
-                      final currentUser = Supabase.instance.client.auth.currentUser;
-                      final isCurrentUserPost = currentUser != null && post['user_id'] == currentUser.id;
-
-                      return Padding(
-                        padding: EdgeInsets.only(bottom: 8),
-                        child: Card(
-                          elevation: 4,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              ListTile(
-                                leading: FutureBuilder<String?>(
-                                  future: _getUserProfileImage(post['user_id']),
-                                  builder: (context, snapshot) {
-                                    if (snapshot.connectionState == ConnectionState.waiting) {
-                                      return CircleAvatar(radius: 20, backgroundColor: Colors.grey[300]);
-                                    }
-                                    return CircleAvatar(
-                                      radius: 20,
-                                      backgroundImage: NetworkImage(snapshot.data ?? 'https://via.placeholder.com/64'),
-                                    );
-                                  },
-                                ),
-                                title: FutureBuilder<String?>(
-                                  future: _getUserName(post['user_id']),
-                                  builder: (context, snapshot) {
-                                    if (snapshot.connectionState == ConnectionState.waiting) {
-                                      return Text('Loading...', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xff5e3e2b)));
-                                    }
-                                    return Text(
-                                      snapshot.data ?? 'Anonymous',
-                                      style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xff5e3e2b)),
-                                    );
-                                  },
-                                ),
-                                subtitle: Text(
-                                  DateFormat('MMM d, hh:mm a').format(DateTime.parse(post['created_at'])),
-                                  style: TextStyle(color: Colors.grey[600]),
-                                ),
-                                trailing: isCurrentUserPost
-                                    ? IconButton(
-                                  icon: Icon(Icons.more_vert, color: Color(0xff5e3e2b)),
-                                  onPressed: () => _showPostOptions(context, post),
-                                )
-                                    : null,
-                              ),
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(12),
-                                child: Image.network(
-                                  post['image_url'],
-                                  width: double.infinity,
-                                  height: 300,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) => Container(
-                                    width: double.infinity,
-                                    height: 300,
-                                    color: Colors.grey[300],
-                                    child: Center(child: Text('Image not available')),
-                                  ),
-                                ),
-                              ),
-                              Padding(
-                                padding: EdgeInsets.all(12),
-                                child: Text(
-                                  post['caption'],
-                                  style: TextStyle(fontSize: 16, color: Colors.black87),
-                                ),
-                              ),
-                              Padding(
-                                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        IconButton(
-                                          icon: Icon(Icons.arrow_upward, color: isUpvoted ? Colors.green : Colors.grey, size: 28),
-                                          onPressed: () => _votePost(post['id'].toString(), true),
-                                        ),
-                                        Text('${post['upvotes']}', style: TextStyle(color: Colors.grey[700])),
-                                      ],
-                                    ),
-                                    Row(
-                                      children: [
-                                        IconButton(
-                                          icon: Icon(Icons.arrow_downward, color: isDownvoted ? Colors.red : Colors.grey, size: 28),
-                                          onPressed: () => _votePost(post['id'].toString(), false),
-                                        ),
-                                        Text('${post['downvotes']}', style: TextStyle(color: Colors.grey[700])),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ).animate().fadeIn(duration: 300.ms).slideY(begin: 0.1),
-                      );
-                    },
-                  ),
-                ),
-              ),
+              _buildHeader(),
+              _buildHashtagsSection(),
+              Expanded(child: _buildPostsList(displayedPosts)),
             ],
           ),
         ),
       ),
     );
   }
+
+  Widget _buildHeader() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: const BoxDecoration(
+        color: Color(0xff926247),
+        boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 4))],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          IconButton(
+            icon: const Icon(Icons.arrow_back_ios_rounded, color: Colors.white, size: 28),
+            onPressed: () => Navigator.pop(context),
+          ),
+          Row(
+            children: [
+              const Text('Community', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white)),
+              const SizedBox(width: 8),
+              PopupMenuButton<String>(
+                icon: const Icon(Icons.sort, color: Colors.white),
+                onSelected: (value) {
+                  setState(() {
+                    if (value == 'reverse') {
+                      _isSortAscending = !_isSortAscending;
+                    } else {
+                      _currentSort = value;
+                    }
+                    _posts = _sortPosts(_posts);
+                  });
+                },
+                itemBuilder: (context) => [
+                  const PopupMenuItem(value: 'upvotes', child: Text('Sort by Upvotes')),
+                  const PopupMenuItem(value: 'downvotes', child: Text('Sort by Downvotes')),
+                  const PopupMenuItem(value: 'latest', child: Text('Sort by Latest')),
+                  const PopupMenuItem(value: 'oldest', child: Text('Sort by Oldest')),
+                  const PopupMenuDivider(),
+                  PopupMenuItem(value: 'reverse', child: Text(_isSortAscending ? 'Ascending' : 'Descending')),
+                ],
+              ),
+            ],
+          ),
+          IconButton(
+            icon: const CircleAvatar(
+              radius: 18,
+              backgroundColor: Colors.white,
+              child: Icon(Icons.add, color: Color(0xff5e3e2b), size: 24),
+            ),
+            onPressed: _pickImage,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHashtagsSection() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Themed Discussion', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xff5e3e2b))),
+          const SizedBox(height: 12),
+          if (_uniqueHashtags.isNotEmpty)
+            Wrap(
+              spacing: 8.0,
+              runSpacing: 8.0,
+              children: _uniqueHashtags.map((hashtag) {
+                final buttonText = hashtag.replaceAll('#', '').toUpperCase();
+                final buttonColor = const [Color(0xff9bb068), Color(0xff6b9b68), Color(0xff689b9b)][_uniqueHashtags.indexOf(hashtag) % 3];
+                return ElevatedButton(
+                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => CommunityPage(theme: widget.theme == buttonText ? null : buttonText))),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: buttonColor,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  ),
+                  child: Text(buttonText, style: const TextStyle(color: Colors.white, fontSize: 14)),
+                ).animate().fadeIn(duration: 300.ms);
+              }).toList(),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPostsList(List<Map<String, dynamic>> posts) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, -4))],
+      ),
+      child: _isLoading
+          ? const Center(child: CircularProgressIndicator(color: Color(0xff5e3e2b)))
+          : posts.isEmpty
+          ? const Padding(
+        padding: EdgeInsets.all(16),
+        child: Text('No posts yet for this theme. Be the first to share!', style: TextStyle(fontSize: 16, color: Colors.grey), textAlign: TextAlign.center),
+      )
+          : ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: posts.length,
+        itemBuilder: (context, index) => _buildPostCard(posts[index]),
+      ),
+    );
+  }
+
+  Widget _buildPostCard(Map<String, dynamic> post) {
+    final isUpvoted = post['userVote'] == 'upvote';
+    final isDownvoted = post['userVote'] == 'downvote';
+    final currentUser = supabase.auth.currentUser;
+    final isCurrentUserPost = currentUser != null && post['user_id'] == currentUser.id;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Card(
+        elevation: 4,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ListTile(
+              leading: FutureBuilder<String?>(
+                future: _getUserInfo(post['user_id'], 'avatar_url'),
+                builder: (context, snapshot) => CircleAvatar(
+                  radius: 20,
+                  backgroundImage: snapshot.data != null ? NetworkImage(snapshot.data!) : null,
+                  backgroundColor: snapshot.connectionState == ConnectionState.waiting ? Colors.grey[300] : null,
+                ),
+              ),
+              title: FutureBuilder<String?>(
+                future: _getUserInfo(post['user_id'], 'full_name'),
+                builder: (context, snapshot) => Text(
+                  snapshot.data ?? 'Loading...',
+                  style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xff5e3e2b)),
+                ),
+              ),
+              subtitle: Text(DateFormat('MMM d, hh:mm a').format(DateTime.parse(post['created_at']))),
+              trailing: isCurrentUserPost
+                  ? IconButton(icon: const Icon(Icons.more_vert, color: Color(0xff5e3e2b)), onPressed: () => _showPostOptions(post))
+                  : null,
+            ),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.network(
+                post['image_url'],
+                width: double.infinity,
+                height: 300,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => Container(
+                  width: double.infinity,
+                  height: 300,
+                  color: Colors.grey[300],
+                  child: const Center(child: Text('Image not available')),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Text(post['caption'], style: const TextStyle(fontSize: 16)),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  _buildVoteButton(Icons.arrow_upward, post['upvotes'], () => _votePost(post['id'].toString(), true), isUpvoted ? Colors.green : Colors.grey),
+                  _buildVoteButton(Icons.arrow_downward, post['downvotes'], () => _votePost(post['id'].toString(), false), isDownvoted ? Colors.red : Colors.grey),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ).animate().fadeIn(duration: 300.ms).slideY(begin: 0.1),
+    );
+  }
+
+  Widget _buildVoteButton(IconData icon, int count, VoidCallback onPressed, Color color) {
+    return Row(
+      children: [
+        IconButton(icon: Icon(icon, color: color, size: 28), onPressed: onPressed),
+        Text('$count', style: const TextStyle(color: Colors.grey)),
+      ],
+    );
+  }
 }
 
 class ThemedDiscussionPage extends StatelessWidget {
   final String theme;
-
   const ThemedDiscussionPage({super.key, required this.theme});
 
   @override
@@ -733,6 +642,6 @@ class ThemedDiscussionPage extends StatelessWidget {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Navigator.push(context, MaterialPageRoute(builder: (context) => CommunityPage(theme: theme)));
     });
-    return Scaffold(body: Center(child: CircularProgressIndicator()));
+    return const Scaffold(body: Center(child: CircularProgressIndicator()));
   }
 }

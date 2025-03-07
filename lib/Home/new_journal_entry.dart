@@ -132,7 +132,7 @@ class _NewJournalEntryPageState extends State<NewJournalEntryPage> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       IconButton(
-                        icon: Icon(Icons.arrow_back_ios_rounded, color: Color(0xff5e3e2b), size: 28),
+                        icon: Icon(Icons.arrow_back_ios_rounded, color: Color(0xff5e3e2b), size: 20),
                         onPressed: () => Navigator.pushReplacement(
                           context,
                           MaterialPageRoute(builder: (context) => const JournalPage()),
@@ -143,7 +143,7 @@ class _NewJournalEntryPageState extends State<NewJournalEntryPage> {
                       Text(
                         widget.isEditing ? 'Edit Journal Entry' : 'New Journal Entry',
                         style: TextStyle(
-                          fontSize: 24,
+                          fontSize: 20,
                           fontWeight: FontWeight.bold,
                           color: Color(0xff5e3e2b),
                           shadows: [
@@ -226,7 +226,7 @@ class _NewJournalEntryPageState extends State<NewJournalEntryPage> {
                           });
                         },
                         child: Container(
-                          padding: EdgeInsets.all(isSelected ? 12 : 8),
+                          padding: EdgeInsets.all(isSelected ? 8 : 8),
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             color: isSelected

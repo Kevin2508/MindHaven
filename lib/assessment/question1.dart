@@ -1,45 +1,267 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-class QuestionPage extends StatefulWidget {
-  final int questionNumber;
-  final String questionText;
-  final Map<String, IconData> options;
-  final int totalQuestions;
-
-  const QuestionPage({
-    Key? key,
-    required this.questionNumber,
-    required this.questionText,
-    required this.options,
-    required this.totalQuestions,
-  }) : super(key: key);
+class AssessmentPage extends StatefulWidget {
+  const AssessmentPage({Key? key}) : super(key: key);
 
   @override
-  _QuestionPageState createState() => _QuestionPageState();
+  _AssessmentPageState createState() => _AssessmentPageState();
 }
 
-class _QuestionPageState extends State<QuestionPage> {
+class _AssessmentPageState extends State<AssessmentPage> {
+  int _currentQuestion = 1;
   String? _selectedOption;
-  final Map<int, String?> _answers = {}; // Store answers for each question
+  final Map<int, String?> _answers = {};
 
-  @override
-  void initState() {
-    super.initState();
-    // Initialize with any previous answer if navigating back
-    _answers[widget.questionNumber] = _answers[widget.questionNumber];
-  }
+  final List<Map<String, dynamic>> _questions = [
+    {
+      'number': 1,
+      'text': 'How would you rate your current mood?',
+      'options': {
+        'Very Good': Icons.sentiment_very_satisfied,
+        'Good': Icons.sentiment_satisfied,
+        'Neutral': Icons.sentiment_neutral,
+        'Bad': Icons.sentiment_dissatisfied,
+        'Very Bad': Icons.sentiment_very_dissatisfied,
+      }
+    },
+    {
+      'number': 2,
+      'text': 'I feel sad and low',
+      'options': {
+        'Never': Icons.sentiment_satisfied,
+        'Hardly ever': Icons.sentiment_neutral,
+        'Some of the time': Icons.sentiment_dissatisfied,
+        'Most of the time': Icons.sentiment_very_dissatisfied,
+        'All the time': Icons.sentiment_very_dissatisfied,
+      }
+    },
+    {
+      'number': 3,
+      'text': 'I feel anxious or nervous',
+      'options': {
+        'Never': Icons.sentiment_satisfied,
+        'Hardly ever': Icons.sentiment_neutral,
+        'Some of the time': Icons.sentiment_dissatisfied,
+        'Most of the time': Icons.sentiment_very_dissatisfied,
+        'All the time': Icons.sentiment_very_dissatisfied,
+      }
+    },
+    {
+      'number': 4,
+      'text': 'I have difficulty concentrating',
+      'options': {
+        'Never': Icons.sentiment_satisfied,
+        'Hardly ever': Icons.sentiment_neutral,
+        'Some of the time': Icons.sentiment_dissatisfied,
+        'Most of the time': Icons.sentiment_very_dissatisfied,
+        'All the time': Icons.sentiment_very_dissatisfied,
+      }
+    },
+    {
+      'number': 5,
+      'text': 'I feel tired or have low energy',
+      'options': {
+        'Never': Icons.sentiment_satisfied,
+        'Hardly ever': Icons.sentiment_neutral,
+        'Some of the time': Icons.sentiment_dissatisfied,
+        'Most of the time': Icons.sentiment_very_dissatisfied,
+        'All the time': Icons.sentiment_very_dissatisfied,
+      }
+    },
+    {
+      'number': 6,
+      'text': 'I have lost interest in things I usually enjoy',
+      'options': {
+        'Never': Icons.sentiment_satisfied,
+        'Hardly ever': Icons.sentiment_neutral,
+        'Some of the time': Icons.sentiment_dissatisfied,
+        'Most of the time': Icons.sentiment_very_dissatisfied,
+        'All the time': Icons.sentiment_very_dissatisfied,
+      }
+    },
+    {
+      'number': 7,
+      'text': 'I feel worthless or guilty',
+      'options': {
+        'Never': Icons.sentiment_satisfied,
+        'Hardly ever': Icons.sentiment_neutral,
+        'Some of the time': Icons.sentiment_dissatisfied,
+        'Most of the time': Icons.sentiment_very_dissatisfied,
+        'All the time': Icons.sentiment_very_dissatisfied,
+      }
+    },
+    {
+      'number': 8,
+      'text': 'I have trouble making decisions',
+      'options': {
+        'Never': Icons.sentiment_satisfied,
+        'Hardly ever': Icons.sentiment_neutral,
+        'Some of the time': Icons.sentiment_dissatisfied,
+        'Most of the time': Icons.sentiment_very_dissatisfied,
+        'All the time': Icons.sentiment_very_dissatisfied,
+      }
+    },
+    {
+      'number': 9,
+      'text': 'I feel irritable or angry',
+      'options': {
+        'Never': Icons.sentiment_satisfied,
+        'Hardly ever': Icons.sentiment_neutral,
+        'Some of the time': Icons.sentiment_dissatisfied,
+        'Most of the time': Icons.sentiment_very_dissatisfied,
+        'All the time': Icons.sentiment_very_dissatisfied,
+      }
+    },
+    {
+      'number': 10,
+      'text': 'I have physical symptoms like headaches or stomach aches',
+      'options': {
+        'Never': Icons.sentiment_satisfied,
+        'Hardly ever': Icons.sentiment_neutral,
+        'Some of the time': Icons.sentiment_dissatisfied,
+        'Most of the time': Icons.sentiment_very_dissatisfied,
+        'All the time': Icons.sentiment_very_dissatisfied,
+      }
+    },
+    {
+      'number': 11,
+      'text': 'I feel hopeless about the future',
+      'options': {
+        'Never': Icons.sentiment_satisfied,
+        'Hardly ever': Icons.sentiment_neutral,
+        'Some of the time': Icons.sentiment_dissatisfied,
+        'Most of the time': Icons.sentiment_very_dissatisfied,
+        'All the time': Icons.sentiment_very_dissatisfied,
+      }
+    },
+    {
+      'number': 12,
+      'text': 'I have changes in my appetite',
+      'options': {
+        'Never': Icons.sentiment_satisfied,
+        'Hardly ever': Icons.sentiment_neutral,
+        'Some of the time': Icons.sentiment_dissatisfied,
+        'Most of the time': Icons.sentiment_very_dissatisfied,
+        'All the time': Icons.sentiment_very_dissatisfied,
+      }
+    },
+    {
+      'number': 13,
+      'text': 'I feel restless or slowed down',
+      'options': {
+        'Never': Icons.sentiment_satisfied,
+        'Hardly ever': Icons.sentiment_neutral,
+        'Some of the time': Icons.sentiment_dissatisfied,
+        'Most of the time': Icons.sentiment_very_dissatisfied,
+        'All the time': Icons.sentiment_very_dissatisfied,
+      }
+    },
+    {
+      'number': 14,
+      'text': 'I have thoughts of harming myself',
+      'options': {
+        'Never': Icons.sentiment_satisfied,
+        'Hardly ever': Icons.sentiment_neutral,
+        'Some of the time': Icons.sentiment_dissatisfied,
+        'Most of the time': Icons.sentiment_very_dissatisfied,
+        'All the time': Icons.sentiment_very_dissatisfied,
+      }
+    },
+    {
+      'number': 15,
+      'text': 'I feel disconnected from others',
+      'options': {
+        'Never': Icons.sentiment_satisfied,
+        'Hardly ever': Icons.sentiment_neutral,
+        'Some of the time': Icons.sentiment_dissatisfied,
+        'Most of the time': Icons.sentiment_very_dissatisfied,
+        'All the time': Icons.sentiment_very_dissatisfied,
+      }
+    },
+    {
+      'number': 16,
+      'text': 'I have difficulty remembering things',
+      'options': {
+        'Never': Icons.sentiment_satisfied,
+        'Hardly ever': Icons.sentiment_neutral,
+        'Some of the time': Icons.sentiment_dissatisfied,
+        'Most of the time': Icons.sentiment_very_dissatisfied,
+        'All the time': Icons.sentiment_very_dissatisfied,
+      }
+    },
+    {
+      'number': 17,
+      'text': 'I feel overwhelmed by daily tasks',
+      'options': {
+        'Never': Icons.sentiment_satisfied,
+        'Hardly ever': Icons.sentiment_neutral,
+        'Some of the time': Icons.sentiment_dissatisfied,
+        'Most of the time': Icons.sentiment_very_dissatisfied,
+        'All the time': Icons.sentiment_very_dissatisfied,
+      }
+    },
+    {
+      'number': 18,
+      'text': 'I have trouble relaxing',
+      'options': {
+        'Never': Icons.sentiment_satisfied,
+        'Hardly ever': Icons.sentiment_neutral,
+        'Some of the time': Icons.sentiment_dissatisfied,
+        'Most of the time': Icons.sentiment_very_dissatisfied,
+        'All the time': Icons.sentiment_very_dissatisfied,
+      }
+    },
+    {
+      'number': 19,
+      'text': 'I feel like I\'m a burden to others',
+      'options': {
+        'Never': Icons.sentiment_satisfied,
+        'Hardly ever': Icons.sentiment_neutral,
+        'Some of the time': Icons.sentiment_dissatisfied,
+        'Most of the time': Icons.sentiment_very_dissatisfied,
+        'All the time': Icons.sentiment_very_dissatisfied,
+      }
+    },
+    {
+      'number': 20,
+      'text': 'I have lost confidence in myself',
+      'options': {
+        'Never': Icons.sentiment_satisfied,
+        'Hardly ever': Icons.sentiment_neutral,
+        'Some of the time': Icons.sentiment_dissatisfied,
+        'Most of the time': Icons.sentiment_very_dissatisfied,
+        'All the time': Icons.sentiment_very_dissatisfied,
+      }
+    },
+    {
+      'number': 21,
+      'text': 'My sleep is disturbed (unrestful or broken sleep)',
+      'options': {
+        'Never': Icons.sentiment_satisfied,
+        'Hardly ever': Icons.sentiment_neutral,
+        'Some of the time': Icons.sentiment_dissatisfied,
+        'Most of the time': Icons.sentiment_very_dissatisfied,
+        'All the time': Icons.sentiment_very_dissatisfied,
+      }
+    },
+  ];
 
   int _calculateScore(String? answer) {
     switch (answer) {
+      case 'Very Good':
       case 'Never':
         return 5;
+      case 'Good':
       case 'Hardly ever':
         return 4;
+      case 'Neutral':
       case 'Some of the time':
         return 3;
+      case 'Bad':
       case 'Most of the time':
         return 2;
+      case 'Very Bad':
       case 'All the time':
         return 1;
       default:
@@ -55,7 +277,7 @@ class _QuestionPageState extends State<QuestionPage> {
       return;
     }
 
-    _answers[widget.questionNumber] = _selectedOption;
+    _answers[_currentQuestion] = _selectedOption;
     try {
       final supabase = Supabase.instance.client;
       final user = supabase.auth.currentUser;
@@ -63,47 +285,43 @@ class _QuestionPageState extends State<QuestionPage> {
         final score = _calculateScore(_selectedOption);
         await supabase.from('questionnaire_responses').upsert({
           'user_id': user.id,
-          'question_number': widget.questionNumber,
+          'question_number': _currentQuestion,
           'answer': _selectedOption,
-          'score': score, // Add score to the response
+          'score': score,
         });
-        print('Answer saved for question ${widget.questionNumber}: $_selectedOption with score $score');
+      }
+
+      if (_currentQuestion < _questions.length) {
+        setState(() {
+          _currentQuestion++;
+          _selectedOption = _answers[_currentQuestion]; // Load previous answer if exists
+        });
+      } else {
+        Navigator.pushReplacementNamed(context, '/home');
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error saving answer: $e')),
       );
-      return;
-    }
-
-    if (widget.questionNumber < widget.totalQuestions) {
-      Navigator.pushNamed(
-        context,
-        '/question${widget.questionNumber + 1}',
-      );
-    } else {
-      Navigator.pushNamed(context, '/home');
     }
   }
 
   Future<bool> _onWillPop() async {
-    if (widget.questionNumber > 2) { // Start from question 2 since mood is question 1
-      Navigator.pushNamed(
-        context,
-        '/question${widget.questionNumber - 1}',
-      );
+    if (_currentQuestion > 1) {
+      setState(() {
+        _currentQuestion--;
+        _selectedOption = _answers[_currentQuestion];
+      });
       return false;
-    } else if (widget.questionNumber == 2) {
-      Navigator.pushNamed(context, '/mood'); // Back to mood page
-      return false;
-    } else {
-      return false; // Prevent default behavior for question 1 (mood)
     }
+    return true;
   }
 
   @override
   Widget build(BuildContext context) {
-    final progress = widget.questionNumber / widget.totalQuestions;
+    final currentQ = _questions[_currentQuestion - 1];
+    final progress = _currentQuestion / _questions.length;
+
     return WillPopScope(
       onWillPop: _onWillPop,
       child: Scaffold(
@@ -113,9 +331,7 @@ class _QuestionPageState extends State<QuestionPage> {
           elevation: 0,
           leading: IconButton(
             icon: const Icon(Icons.arrow_back, color: Colors.black),
-            onPressed: () {
-              _onWillPop();
-            },
+            onPressed: () => _onWillPop(),
           ),
           actions: [
             Padding(
@@ -128,7 +344,7 @@ class _QuestionPageState extends State<QuestionPage> {
                 child: Padding(
                   padding: const EdgeInsets.all(8.0),
                   child: Text(
-                    "Question ${widget.questionNumber} of ${widget.totalQuestions}",
+                    "Question $_currentQuestion of ${_questions.length}",
                     style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
@@ -144,7 +360,6 @@ class _QuestionPageState extends State<QuestionPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Progress Bar
               LinearProgressIndicator(
                 value: progress,
                 backgroundColor: Colors.grey[300],
@@ -153,9 +368,8 @@ class _QuestionPageState extends State<QuestionPage> {
                 borderRadius: BorderRadius.circular(10),
               ),
               const SizedBox(height: 20),
-              // Question Text
               Text(
-                widget.questionText,
+                currentQ['text'],
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   color: Colors.black,
@@ -164,20 +378,18 @@ class _QuestionPageState extends State<QuestionPage> {
                 ),
               ),
               const SizedBox(height: 10),
-              // Question Image
               Image.asset(
                 'assets/images/question.png',
                 width: 130,
                 height: 130,
               ),
               const SizedBox(height: 10),
-              // Options
               Expanded(
                 child: ListView.builder(
-                  itemCount: widget.options.length,
+                  itemCount: currentQ['options'].length,
                   itemBuilder: (context, index) {
-                    final option = widget.options.keys.elementAt(index);
-                    final icon = widget.options[option];
+                    final option = currentQ['options'].keys.elementAt(index);
+                    final icon = currentQ['options'][option];
                     return Padding(
                       padding: const EdgeInsets.symmetric(vertical: 8.0),
                       child: GestureDetector(

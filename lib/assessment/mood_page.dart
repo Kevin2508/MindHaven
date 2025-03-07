@@ -56,7 +56,7 @@ class _MoodPageState extends State<MoodPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Mood and score saved successfully!')),
       );
-      Navigator.pushNamed(context, '/question2'); // Navigate to question 2
+      Navigator.pushNamed(context, '/mood'); // Navigate to question 2
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error saving mood and score: $e')),
@@ -64,7 +64,11 @@ class _MoodPageState extends State<MoodPage> {
       print('Error saving mood and score: $e');
     }
   }
-
+  Future<bool> _onBackPressed() async {
+    // Navigate to HomePage on back press
+    Navigator.pushNamed(context, '/home');
+    return false; // Prevent default back navigation
+  }
   @override
   Widget build(BuildContext context) {
     return Scaffold(

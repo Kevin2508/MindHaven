@@ -38,12 +38,9 @@ void main() async {
   ]);
 
   // Initialize notifications
-  await NotificationService().initialize();
 
   // Set up notification action handler
-  AwesomeNotifications().setListeners(
-    onActionReceivedMethod: NotificationService.onActionReceivedMethod,
-  );
+
 
   runApp(
     ChangeNotifierProvider(
@@ -91,7 +88,7 @@ class MyApp extends StatelessWidget {
         '/EnterNamePage': (context) => const EnterNamePage(),
         '/profile': (context) => const ProfilePage(),
         '/chat': (context) => const ChatScreen(),
-        '/mood': (context) => const MoodPage(),
+        '/mood': (context) => const AssessmentPage(), // Replace mood page with AssessmentPage
         '/graph': (context) => const GraphPage(),
         '/exercises': (context) => ExercisePage(),
         '/journal': (context) => JournalPage(),
@@ -99,31 +96,6 @@ class MyApp extends StatelessWidget {
         '/meditation': (context) => BreathingExercisePage(),
         '/community': (context) => CommunityPage(),
         '/dashboard': (context) => GraphPage(),
-        '/question2': (context) => const QuestionPage(
-          questionNumber: 2,
-          questionText: 'I feel sad and low',
-          options: {
-            'Never': Icons.sentiment_satisfied,
-            'Hardly ever': Icons.sentiment_neutral,
-            'Some of the time': Icons.sentiment_dissatisfied,
-            'Most of the time': Icons.sentiment_very_dissatisfied,
-            'All the time': Icons.sentiment_very_dissatisfied,
-          },
-          totalQuestions: 21,
-        ),
-        // ... (rest of the routes remain the same)
-        '/question21': (context) => const QuestionPage(
-          questionNumber: 21,
-          questionText: 'My sleep is disturbed (unrestful or broken sleep)',
-          options: {
-            'Never': Icons.sentiment_satisfied,
-            'Hardly ever': Icons.sentiment_neutral,
-            'Some of the time': Icons.sentiment_dissatisfied,
-            'Most of the time': Icons.sentiment_very_dissatisfied,
-            'All the time': Icons.sentiment_very_dissatisfied,
-          },
-          totalQuestions: 21,
-        ),
       },
     );
   }

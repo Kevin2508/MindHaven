@@ -36,8 +36,7 @@ class _HomePageState extends State<HomePage> {
   void initState() {
 
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      NotificationService().sendRecommendationNotification();});
+
     _initializeData();
   }
   Future<void> _fetchChatSessionCount() async {
@@ -540,7 +539,10 @@ class _HomePageState extends State<HomePage> {
               orientation: orientation,
               onPressed: () => Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const MoodPage()),
+                MaterialPageRoute(
+                  builder: (context) => const MoodPage(),
+                  settings: const RouteSettings(arguments: {'fromTracker': true}),
+                ),
               ),
             ),
           ],

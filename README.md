@@ -28,10 +28,14 @@ MindHaven is a mobile application designed to support mental health and well-bei
 
 ## Screenshots
 <!-- Add screenshots to showcase the app's UI. Replace the placeholders with actual image paths or URLs -->
-- **Home Screen**: ![Home Screen](https://via.placeholder.com/300x600.png)
-- **Mood Tracker**: ![Mood Tracker](https://via.placeholder.com/300x600.png)
-- **Chatbot Interface**: ![Chatbot](https://via.placeholder.com/300x600.png)
-- **Community Page**: ![Community](https://via.placeholder.com/300x600.png)
+![WhatsApp Image 2025-04-03 at 9 02 57 PM](https://github.com/user-attachments/assets/39d3f961-f55a-401a-805d-b83204de2ca3)
+![WhatsApp Image 2025-04-07 at 7 33 55 PM (1)](https://github.com/user-attachments/assets/fd86a289-4b5a-4189-93e4-e5007cbe7c92)
+![WhatsApp Image 2025-04-07 at 7 33 55 PM](https://github.com/user-attachments/assets/8ba7930a-2606-45af-990e-f329c8d1480a)
+![WhatsApp Image 2025-04-07 at 7 33 54 PM](https://github.com/user-attachments/assets/31225e87-2e7e-4aa2-96f6-7f9cce03268c)
+![WhatsApp Image 2025-04-03 at 9 04 36 PM](https://github.com/user-attachments/assets/b5cf353a-8ad1-4344-898e-a8ba61588422)
+![WhatsApp Image 2025-04-03 at 9 04 35 PM (2)](https://github.com/user-attachments/assets/910592e1-911c-4c6e-90c3-91814eba5198)
+![WhatsApp Image 2025-04-03 at 9 04 35 PM (1)](https://github.com/user-attachments/assets/82c541c4-aa48-4fd6-86b4-87c94ce95112)
+![WhatsApp Image 2025-04-03 at 9 04 35 PM](https://github.com/user-attachments/assets/877bd714-e0bd-4f7f-9f44-7ef8ab650df5)
 
 ## Installation
 
@@ -45,5 +49,5 @@ MindHaven is a mobile application designed to support mental health and well-bei
 ### Steps
 1. **Clone the Repository**
    ```bash
-   git clone https://github.com/yourusername/mindhaven.git
+   git clone https://github.com/Kevin2508/mindhaven.git
    cd mindhaven

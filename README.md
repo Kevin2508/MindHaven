@@ -1,7 +1,5 @@
 # MindHaven
 
-![MindHaven Logo](https://via.placeholder.com/150) <!-- Replace with your actual logo URL or remove if not available -->
-
 MindHaven is a mobile application designed to support mental health and well-being through mood tracking, mindfulness exercises, an AI-powered therapy chatbot, community support, and personalized recommendations. Built with Flutter and powered by Supabase, this app aims to provide users with tools to monitor their mental health, build healthy habits, and connect with others.
 
 ## Table of Contents
@@ -27,15 +25,17 @@ MindHaven is a mobile application designed to support mental health and well-bei
 - **Profile Management**: View and update your profile with a customizable avatar and name.
 
 ## Screenshots
-<!-- Showcase the app's UI with resized screenshots -->
-- ![Home Screen](https://github.com/user-attachments/assets/39d3f961-f55a-401a-805d-b83204de2ca3 =200x)
-- ![Mood Tracker](https://github.com/user-attachments/assets/fd86a289-4b5a-4189-93e4-e5007cbe7c92 =200x)
-- ![Mood Selection](https://github.com/user-attachments/assets/8ba7930a-2606-45af-990e-f329c8d1480a =200x)
-- ![Score Graph](https://github.com/user-attachments/assets/31225e87-2e7e-4aa2-96f6-7f9cce03268c =200x)
-- ![Chatbot Interface](https://github.com/user-attachments/assets/b5cf353a-8ad1-4344-898e-a8ba61588422 =200x)
-- ![Journal Entry](https://github.com/user-attachments/assets/910592e1-911c-4c6e-90c3-91814eba5198 =200x)
-- ![Photo Journal](https://github.com/user-attachments/assets/82c541c4-aa48-4fd6-86b4-87c94ce95112 =200x)
-- ![Community Page](https://github.com/user-attachments/assets/877bd714-e0bd-4f7f-9f44-7ef8ab650df5 =200x)
+
+<div align="center">
+  <img src="https://github.com/user-attachments/assets/39d3f961-f55a-401a-805d-b83204de2ca3" width="200"/>
+  <img src="https://github.com/user-attachments/assets/fd86a289-4b5a-4189-93e4-e5007cbe7c92" width="200"/>
+  <img src="https://github.com/user-attachments/assets/8ba7930a-2606-45af-990e-f329c8d1480a" width="200"/>
+  <img src="https://github.com/user-attachments/assets/31225e87-2e7e-4aa2-96f6-7f9cce03268c" width="200"/>
+  <img src="https://github.com/user-attachments/assets/b5cf353a-8ad1-4344-898e-a8ba61588422" width="200"/>
+  <img src="https://github.com/user-attachments/assets/910592e1-911c-4c6e-90c3-91814eba5198" width="200"/>
+  <img src="https://github.com/user-attachments/assets/82c541c4-aa48-4fd6-86b4-87c94ce95112" width="200"/>
+  <img src="https://github.com/user-attachments/assets/877bd714-e0bd-4f7f-9f44-7ef8ab650df5" width="200"/>
+</div>
 
 ## Installation
 
